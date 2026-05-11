@@ -10,7 +10,7 @@
         .legend { 
             position:absolute; bottom:15px; left:15px; background:white; 
             padding:12px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); 
-            z-index:1000; font-size:13.5px; line-height:1.7;
+            z-index:1000; font-size:14px; line-height:1.8;
         }
     </style>
 </head>
@@ -33,38 +33,32 @@
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        let currentMarkers = [];
+        let markers = [];
 
         window.addEventListener('message', (event) => {
             if (event.data.type === 'addFacilities') {
-                currentMarkers.forEach(m => map.removeLayer(m));
-                currentMarkers = [];
+                // 清空旧标记
+                markers.forEach(m => map.removeLayer(m));
+                markers = [];
 
                 const facilities = event.data.facilities || [];
-                
-                facilities.forEach(item => {
+                console.log('收到设施数量:', facilities.length);
+
+                facilities.forEach((item, index) => {
                     if (!item.lat || !item.lng) return;
 
                     const emoji = { toilet: '🚽', elevator: '🪜', ramp: '♿', blind_road: '👣' }[item.type] || '📍';
 
                     const marker = L.marker([item.lat, item.lng])
                         .addTo(map)
-                        .bindPopup(`<b>${item.name || '무장애 시설'}</b><br>${emoji} ${item.type || ''}`);
+                        .bindPopup(`<b>${item.name || '무장애 시설'}</b><br>${emoji}`);
 
-                    // 点击标记通知小程序
-                    marker.on('click', () => {
-                        window.parent.postMessage({
-                            type: 'markerClick',
-                            facility: item
-                        }, '*');
-                    });
-
-                    currentMarkers.push(marker);
+                    markers.push(marker);
                 });
             }
         });
 
-        console.log('✅ 대구 무장애 지도 최종 버전 로드 완료');
+        console.log('✅ 최종 지도 버전 로드 완료');
     </script>
 </body>
 </html>
