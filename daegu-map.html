@@ -33,32 +33,23 @@
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        let markers = [];
+        // ==================== 直接添加测试标记 ====================
+        const testFacilities = [
+          { name: "대구역 무장애 화장실", type: "toilet", lat: 35.8714, lng: 128.6014 },
+          { name: "경북대학교 무장애 엘리베이터", type: "elevator", lat: 35.880, lng: 128.590 },
+          { name: "동성로 무장애 경사로", type: "ramp", lat: 35.860, lng: 128.610 },
+          { name: "중앙로 점자블록", type: "blind_road", lat: 35.865, lng: 128.595 }
+        ];
 
-        window.addEventListener('message', (event) => {
-            if (event.data.type === 'addFacilities') {
-                // 清空旧标记
-                markers.forEach(m => map.removeLayer(m));
-                markers = [];
-
-                const facilities = event.data.facilities || [];
-                console.log('收到设施数量:', facilities.length);
-
-                facilities.forEach((item, index) => {
-                    if (!item.lat || !item.lng) return;
-
-                    const emoji = { toilet: '🚽', elevator: '🪜', ramp: '♿', blind_road: '👣' }[item.type] || '📍';
-
-                    const marker = L.marker([item.lat, item.lng])
-                        .addTo(map)
-                        .bindPopup(`<b>${item.name || '무장애 시설'}</b><br>${emoji}`);
-
-                    markers.push(marker);
-                });
-            }
+        testFacilities.forEach(item => {
+          const emoji = { toilet: '🚽', elevator: '🪜', ramp: '♿', blind_road: '👣' }[item.type] || '📍';
+          
+          L.marker([item.lat, item.lng])
+            .addTo(map)
+            .bindPopup(`<b>${item.name}</b><br>${emoji} ${item.type}`);
         });
 
-        console.log('✅ 최종 지도 버전 로드 완료');
+        console.log('✅ 4个测试标记已直接添加');
     </script>
 </body>
 </html>
