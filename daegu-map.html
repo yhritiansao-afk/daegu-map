@@ -35,7 +35,8 @@
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        // 测试数据（直接内置）
+        const userLocation = [35.8714, 128.6014];
+
         const testFacilities = [
           { name: "대구역 무장애 화장실", type: "toilet", lat: 35.8714, lng: 128.6014 },
           { name: "경북대학교 무장애 엘리베이터", type: "elevator", lat: 35.880, lng: 128.590 },
@@ -44,30 +45,49 @@
         ];
 
         let routingControl = null;
-        const userLocation = [35.8714, 128.6014];
 
         testFacilities.forEach(item => {
             const emoji = { toilet: '🚽', elevator: '🪜', ramp: '♿', blind_road: '👣' }[item.type] || '📍';
 
             const marker = L.marker([item.lat, item.lng]).addTo(map);
             
-            marker.bindPopup(`<b>${item.name}</b><br>${emoji}<br><small>클릭하여 경로 보기</small>`);
+            marker.bindPopup(`<b>${item.name}</b><br>${emoji}<br><small>경로를 계산중...</small>`);
 
             marker.on('click', () => {
-                if (routingControl) map.removeControl(routingControl);
+                console.log('🖱️ 点击了:', item.name);
+                
+                // 先移除旧路线
+                if (routingControl) {
+                    map.removeControl(routingControl);
+                }
 
-                routingControl = L.Routing.control({
-                    waypoints: [
-                        L.latLng(userLocation),
-                        L.latLng(item.lat, item.lng)
-                    ],
-                    lineOptions: { styles: [{ color: '#3388ff', weight: 7 }] },
-                    language: 'ko'
-                }).addTo(map);
+                try {
+                    routingControl = L.Routing.control({
+                        waypoints: [
+                            L.latLng(userLocation[0], userLocation[1]),
+                            L.latLng(item.lat, item.lng)
+                        ],
+                        lineOptions: { 
+                            styles: [{ color: '#3388ff', weight: 7, opacity: 0.9 }] 
+                        },
+                        show: false,
+                        addWaypoints: false,
+                        language: 'ko'
+                    }).addTo(map);
+
+                    console.log('🛤️ 路线规划成功');
+                } catch (err) {
+                    console.error('路线规划失败:', err);
+                    // 备用方案：画一条直线
+                    L.polyline([userLocation, [item.lat, item.lng]], {
+                        color: 'red', weight: 5
+                    }).addTo(map);
+                    alert('路线规划组件加载失败，已显示直线');
+                }
             });
         });
 
-        console.log('✅ 대구 지도 + 마커 + 경로 계획 기능 로드 완료');
+        console.log('✅ 地图 + 4个标记点 + 路径规划 已就绪');
     </script>
 </body>
 </html>
