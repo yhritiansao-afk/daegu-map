@@ -11,7 +11,7 @@
         .legend { 
             position:absolute; bottom:15px; left:15px; background:white; 
             padding:12px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); 
-            z-index:1000; font-size:13.5px; line-height:1.7; 
+            z-index:1000; font-size:14px; line-height:1.8; 
         }
     </style>
 </head>
@@ -29,66 +29,45 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
     <script>
-        let map, routingControl = null;
-        const userLocation = [35.8714, 128.6014];
-
-        map = L.map('map').setView(userLocation, 13);
+        const map = L.map('map').setView([35.8714, 128.6014], 13);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        let markers = [];
+        // 测试数据（直接内置）
+        const testFacilities = [
+          { name: "대구역 무장애 화장실", type: "toilet", lat: 35.8714, lng: 128.6014 },
+          { name: "경북대학교 무장애 엘리베이터", type: "elevator", lat: 35.880, lng: 128.590 },
+          { name: "동성로 무장애 경사로", type: "ramp", lat: 35.860, lng: 128.610 },
+          { name: "중앙로 점자블록", type: "blind_road", lat: 35.865, lng: 128.595 }
+        ];
 
-        window.addEventListener('message', (event) => {
-            if (event.data.type === 'addFacilities') {
-                // 清除旧标记
-                markers.forEach(m => map.removeLayer(m));
-                markers = [];
+        let routingControl = null;
+        const userLocation = [35.8714, 128.6014];
 
-                const facilities = event.data.facilities || [];
-                console.log('📍收到设施数据:', facilities.length, '条');
+        testFacilities.forEach(item => {
+            const emoji = { toilet: '🚽', elevator: '🪜', ramp: '♿', blind_road: '👣' }[item.type] || '📍';
 
-                facilities.forEach(item => {
-                    if (!item.lat || !item.lng) return;
+            const marker = L.marker([item.lat, item.lng]).addTo(map);
+            
+            marker.bindPopup(`<b>${item.name}</b><br>${emoji}<br><small>클릭하여 경로 보기</small>`);
 
-                    const emoji = { toilet: '🚽', elevator: '🪜', ramp: '♿', blind_road: '👣' }[item.type] || '📍';
+            marker.on('click', () => {
+                if (routingControl) map.removeControl(routingControl);
 
-                    const marker = L.marker([item.lat, item.lng], {
-                        title: item.name
-                    }).addTo(map);
-
-                    marker.bindPopup(`<b>${item.name}</b><br>${emoji}<br><small>클릭 시 경로 안내</small>`);
-
-                    marker.on('click', () => {
-                        console.log('🖱️ 标记被点击:', item.name);
-                        showRoute(item);
-                    });
-
-                    markers.push(marker);
-                });
-            }
+                routingControl = L.Routing.control({
+                    waypoints: [
+                        L.latLng(userLocation),
+                        L.latLng(item.lat, item.lng)
+                    ],
+                    lineOptions: { styles: [{ color: '#3388ff', weight: 7 }] },
+                    language: 'ko'
+                }).addTo(map);
+            });
         });
 
-        function showRoute(facility) {
-            if (routingControl) {
-                map.removeControl(routingControl);
-            }
-
-            routingControl = L.Routing.control({
-                waypoints: [
-                    L.latLng(userLocation),
-                    L.latLng(facility.lat, facility.lng)
-                ],
-                routeWhileDragging: false,
-                language: 'ko',
-                lineOptions: { styles: [{ color: '#3388ff', weight: 6 }] }
-            }).addTo(map);
-
-            console.log('🛤️ 路径规划已显示：', facility.name);
-        }
-
-        console.log('✅ 大邱地图 + 路径规划功能已加载');
+        console.log('✅ 대구 지도 + 마커 + 경로 계획 기능 로드 완료');
     </script>
 </body>
 </html>
