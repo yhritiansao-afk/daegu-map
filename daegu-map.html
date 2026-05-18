@@ -12,7 +12,11 @@
             padding:12px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); 
             z-index:1000; font-size:14px; line-height:1.8; 
         }
-        .info { position:absolute; top:15px; left:15px; background:white; padding:10px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:13px; }
+        .info { 
+            position:absolute; top:15px; left:15px; background:white; 
+            padding:10px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); 
+            z-index:1000; font-size:13.5px; 
+        }
     </style>
 </head>
 <body>
@@ -26,7 +30,7 @@
         👣 점자블록
     </div>
 
-    <div class="info">点击标记点 → 显示路径</div>
+    <div class="info">마커를 클릭하세요 → 경로 표시</div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -55,27 +59,24 @@
             marker.bindPopup(`<b>${item.name}</b><br>${emoji}`);
 
             marker.on('click', () => {
-                // 清除旧路线
                 if (currentLine) map.removeLayer(currentLine);
 
-                // 画蓝色直线（更美观）
                 currentLine = L.polyline([userLocation, [item.lat, item.lng]], {
                     color: '#3388ff',
                     weight: 6,
                     opacity: 0.9
                 }).addTo(map);
 
-                // 计算大致距离
                 const distance = map.distance(userLocation, [item.lat, item.lng]).toFixed(0);
 
                 L.popup()
                     .setLatLng([(userLocation[0] + item.lat)/2, (userLocation[1] + item.lng)/2])
-                    .setContent(`<b>直线距离约 ${distance} 米</b><br>（实际路径规划开发中）`)
+                    .setContent(`<b>직선 거리 약 ${distance} 미터</b><br><small>（실제 경로 계획 개발 중）</small>`)
                     .openOn(map);
             });
         });
 
-        console.log('✅ 路径规划演示版已就绪（蓝色直线）');
+        console.log('✅ 대구 무장애 지도 + 경로 계획 데모 완성');
     </script>
 </body>
 </html>
