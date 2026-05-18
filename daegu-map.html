@@ -30,7 +30,7 @@
         👣 점자블록
     </div>
 
-    <div class="info">마커를 클릭하세요 → 경로 표시</div>
+    <div class="info">👉 첫 번째 마커 클릭 → 시작점<br>👉 두 번째 마커 클릭 → 도착점</div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -40,15 +40,14 @@
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        const userLocation = [35.8714, 128.6014];
-
         const testFacilities = [
-          { name: "대구역 무장애 화장실", type: "toilet", lat: 35.8714, lng: 128.6014 },
-          { name: "경북대학교 무장애 엘리베이터", type: "elevator", lat: 35.880, lng: 128.590 },
-          { name: "동성로 무장애 경사로", type: "ramp", lat: 35.860, lng: 128.610 },
-          { name: "중앙로 점자블록", type: "blind_road", lat: 35.865, lng: 128.595 }
+          { id:1, name: "대구역 무장애 화장실", type: "toilet", lat: 35.8714, lng: 128.6014 },
+          { id:2, name: "경북대학교 무장애 엘리베이터", type: "elevator", lat: 35.880, lng: 128.590 },
+          { id:3, name: "동성로 무장애 경사로", type: "ramp", lat: 35.860, lng: 128.610 },
+          { id:4, name: "중앙로 점자블록", type: "blind_road", lat: 35.865, lng: 128.595 }
         ];
 
+        let startPoint = null;
         let currentLine = null;
 
         testFacilities.forEach(item => {
@@ -59,24 +58,37 @@
             marker.bindPopup(`<b>${item.name}</b><br>${emoji}`);
 
             marker.on('click', () => {
-                if (currentLine) map.removeLayer(currentLine);
+                if (!startPoint) {
+                    // 第一次点击 → 设置起点
+                    startPoint = item;
+                    L.popup()
+                        .setLatLng([item.lat, item.lng])
+                        .setContent(`<b>✅ 시작점 설정</b><br>${item.name}`)
+                        .openOn(map);
+                } else {
+                    // 第二次点击 → 画路线
+                    if (currentLine) map.removeLayer(currentLine);
 
-                currentLine = L.polyline([userLocation, [item.lat, item.lng]], {
-                    color: '#3388ff',
-                    weight: 6,
-                    opacity: 0.9
-                }).addTo(map);
+                    currentLine = L.polyline([[startPoint.lat, startPoint.lng], [item.lat, item.lng]], {
+                        color: '#3388ff',
+                        weight: 6,
+                        opacity: 0.9
+                    }).addTo(map);
 
-                const distance = map.distance(userLocation, [item.lat, item.lng]).toFixed(0);
+                    const distance = map.distance([startPoint.lat, startPoint.lng], [item.lat, item.lng]).toFixed(0);
 
-                L.popup()
-                    .setLatLng([(userLocation[0] + item.lat)/2, (userLocation[1] + item.lng)/2])
-                    .setContent(`<b>직선 거리 약 ${distance} 미터</b><br><small>（실제 경로 계획 개발 중）</small>`)
-                    .openOn(map);
+                    L.popup()
+                        .setLatLng([(startPoint.lat + item.lat)/2, (startPoint.lng + item.lng)/2])
+                        .setContent(`<b>직선 거리 약 ${distance} 미터</b><br><small>시작: ${startPoint.name}<br>도착: ${item.name}</small>`)
+                        .openOn(map);
+
+                    // 重置起点，方便继续选其他路线
+                    startPoint = null;
+                }
             });
         });
 
-        console.log('✅ 대구 무장애 지도 + 경로 계획 데모 완성');
+        console.log('✅ 자유 경로 선택 기능 완료 (두 지점 선택)');
     </script>
 </body>
 </html>
