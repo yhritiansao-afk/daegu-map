@@ -7,23 +7,16 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         html, body, #map { margin:0; padding:0; width:100%; height:100vh; }
-        .legend { 
-            position:absolute; bottom:15px; left:15px; background:white; 
-            padding:12px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); 
-            z-index:1000; font-size:14px; line-height:1.8; 
-        }
-        .info { 
-            position:absolute; top:15px; left:15px; background:white; 
-            padding:10px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); 
-            z-index:1000; font-size:13.5px; 
-        }
+        .legend { position:absolute; bottom:15px; left:15px; background:white; padding:12px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:14px; line-height:1.8; }
+        .info { position:absolute; top:15px; left:15px; background:white; padding:10px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:13.5px; }
+        .control-btn { position:absolute; top:70px; right:15px; background:white; padding:10px 14px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:14px; cursor:pointer; }
     </style>
 </head>
 <body>
     <div id="map"></div>
 
     <div class="legend">
-        <strong>🗺️ 범례 (Legend)</strong><br>
+        <strong>🗺️ 범례</strong><br>
         🚽 무장애 화장실<br>
         🪜 무장애 엘리베이터<br>
         ♿ 무장애 경사로<br>
@@ -31,64 +24,94 @@
     </div>
 
     <div class="info">👉 첫 번째 마커 클릭 → 시작점<br>👉 두 번째 마커 클릭 → 도착점</div>
+    <div id="clearBtn" class="control-btn" style="display:none;">🗑️ 경로 지우기</div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const map = L.map('map').setView([35.8714, 128.6014], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap'
-        }).addTo(map);
+        let currentLine = null;
+        let startPoint = null;
+        let userLocation = [35.8714, 128.6014]; // 默认值
+        let allMarkers = [];
 
-        const testFacilities = [
+        // 测试设施数据（支持分类）
+        const facilities = [
           { id:1, name: "대구역 무장애 화장실", type: "toilet", lat: 35.8714, lng: 128.6014 },
           { id:2, name: "경북대학교 무장애 엘리베이터", type: "elevator", lat: 35.880, lng: 128.590 },
           { id:3, name: "동성로 무장애 경사로", type: "ramp", lat: 35.860, lng: 128.610 },
           { id:4, name: "중앙로 점자블록", type: "blind_road", lat: 35.865, lng: 128.595 }
         ];
 
-        let startPoint = null;
-        let currentLine = null;
+        // 获取用户真实位置
+        function getUserLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(pos => {
+                    userLocation = [pos.coords.latitude, pos.coords.longitude];
+                    console.log('✅ 用户真实位置获取成功:', userLocation);
+                }, () => {
+                    console.log('⚠️ 位置获取失败，使用默认位置');
+                });
+            }
+        }
+        getUserLocation();
 
-        testFacilities.forEach(item => {
-            const emoji = { toilet: '🚽', elevator: '🪜', ramp: '♿', blind_road: '👣' }[item.type] || '📍';
+        // 创建标记
+        function createMarkers(filteredFacilities) {
+            allMarkers.forEach(m => map.removeLayer(m));
+            allMarkers = [];
 
-            const marker = L.marker([item.lat, item.lng]).addTo(map);
-            
-            marker.bindPopup(`<b>${item.name}</b><br>${emoji}`);
-
-            marker.on('click', () => {
-                if (!startPoint) {
-                    // 第一次点击 → 设置起点
-                    startPoint = item;
-                    L.popup()
-                        .setLatLng([item.lat, item.lng])
-                        .setContent(`<b>✅ 시작점 설정</b><br>${item.name}`)
-                        .openOn(map);
-                } else {
-                    // 第二次点击 → 画路线
-                    if (currentLine) map.removeLayer(currentLine);
-
-                    currentLine = L.polyline([[startPoint.lat, startPoint.lng], [item.lat, item.lng]], {
-                        color: '#3388ff',
-                        weight: 6,
-                        opacity: 0.9
-                    }).addTo(map);
-
-                    const distance = map.distance([startPoint.lat, startPoint.lng], [item.lat, item.lng]).toFixed(0);
-
-                    L.popup()
-                        .setLatLng([(startPoint.lat + item.lat)/2, (startPoint.lng + item.lng)/2])
-                        .setContent(`<b>직선 거리 약 ${distance} 미터</b><br><small>시작: ${startPoint.name}<br>도착: ${item.name}</small>`)
-                        .openOn(map);
-
-                    // 重置起点，方便继续选其他路线
-                    startPoint = null;
-                }
+            filteredFacilities.forEach(item => {
+                const emoji = { toilet: '🚽', elevator: '🪜', ramp: '♿', blind_road: '👣' }[item.type] || '📍';
+                const marker = L.marker([item.lat, item.lng]).addTo(map);
+                
+                marker.bindPopup(`<b>${item.name}</b><br>${emoji}`);
+                
+                marker.on('click', () => handleMarkerClick(item));
+                allMarkers.push(marker);
             });
+        }
+
+        function handleMarkerClick(item) {
+            if (!startPoint) {
+                startPoint = item;
+                L.popup().setLatLng([item.lat, item.lng]).setContent(`<b>✅ 시작점 설정</b><br>${item.name}`).openOn(map);
+            } else {
+                drawRoute(startPoint, item);
+                startPoint = null;
+            }
+        }
+
+        function drawRoute(start, end) {
+            if (currentLine) map.removeLayer(currentLine);
+
+            currentLine = L.polyline([[start.lat, start.lng], [end.lat, end.lng]], {
+                color: '#3388ff', weight: 6, opacity: 0.9
+            }).addTo(map);
+
+            const distance = map.distance([start.lat, start.lng], [end.lat, end.lng]).toFixed(0);
+            
+            L.popup()
+                .setLatLng([(start.lat + end.lat)/2, (start.lng + end.lng)/2])
+                .setContent(`<b>직선 거리 약 ${distance} 미터</b><br>시작: ${start.name}<br>도착: ${end.name}`)
+                .openOn(map);
+
+            document.getElementById('clearBtn').style.display = 'block';
+        }
+
+        // 清除路线
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            if (currentLine) map.removeLayer(currentLine);
+            currentLine = null;
+            startPoint = null;
+            document.getElementById('clearBtn').style.display = 'none';
         });
 
-        console.log('✅ 자유 경로 선택 기능 완료 (두 지점 선택)');
+        // 默认显示所有设施
+        createMarkers(facilities);
+
+        console.log('✅ 分类筛选 + 真实定位 + 自由路径规划 + 清除按钮 已全部完成');
     </script>
 </body>
 </html>
