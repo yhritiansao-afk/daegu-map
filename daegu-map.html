@@ -49,8 +49,8 @@
 
         let currentLine = null;
         let startPoint = null;
-        let userLocation = null;           // 用户真实位置
-        let userMarker = null;             // 用户位置标记
+        let userLocation = [35.8714, 128.6014];
+        let userMarker = null;
 
         const facilities = [
           { id:1, name: "대구역 무장애 화장실", type: "toilet", lat: 35.8714, lng: 128.6014 },
@@ -59,19 +59,20 @@
           { id:4, name: "중앙로 점자블록", type: "blind_road", lat: 35.865, lng: 128.595 }
         ];
 
-        // 获取用户真实位置
+        // 获取用户真实位置并居中
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
                 userLocation = [pos.coords.latitude, pos.coords.longitude];
-                console.log('✅ 用户真实位置获取成功:', userLocation);
+                console.log('✅ 当前位置获取成功:', userLocation);
+                
+                map.setView(userLocation, 14);   // 自动居中并稍微放大
 
-                // 显示用户位置标记（橙色）
                 if (userMarker) map.removeLayer(userMarker);
                 userMarker = L.marker(userLocation, {
-                    icon: L.divIcon({ className: 'user-location', html: '📍', iconSize: [30, 30] })
-                }).addTo(map).bindPopup('📍 현재 위치');
+                    icon: L.divIcon({ className: '', html: '📍', iconSize: [30, 30] })
+                }).addTo(map).bindPopup('<b>📍 현재 위치</b>');
             }, () => {
-                console.log('⚠️ 位置获取失败，使用默认大邱中心');
+                console.log('⚠️ 位置获取失败，使用默认位置');
             });
         }
 
@@ -118,17 +119,18 @@
             document.getElementById('clearBtn').style.display = 'block';
         }
 
-        // 清除路线
+        // 清除路线（彻底清除）
         document.getElementById('clearBtn').addEventListener('click', () => {
             if (currentLine) map.removeLayer(currentLine);
             currentLine = null;
             startPoint = null;
+            map.closePopup();                    // 关闭所有弹窗
             document.getElementById('clearBtn').style.display = 'none';
         });
 
         createMarkers();
 
-        console.log('✅ 优化完成：真实定位 + 清晰提示 + 清除按钮');
+        console.log('✅ 最终优化版：真实定位居中 + 清除按钮彻底清理');
     </script>
 </body>
 </html>
