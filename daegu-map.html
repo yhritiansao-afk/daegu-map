@@ -8,7 +8,11 @@
     <style>
         html, body, #map { margin:0; padding:0; width:100%; height:100vh; }
         .legend { position:absolute; bottom:15px; left:15px; background:white; padding:12px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:14px; line-height:1.8; }
-        .info { position:absolute; top:15px; right:15px; background:white; padding:10px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:13.5px; }
+        .info { 
+            position:absolute; top:15px; right:15px; background:white; 
+            padding:10px 14px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.25); 
+            z-index:1000; font-size:13.5px; transition: all 0.3s ease;
+        }
         .control-btn { position:absolute; top:70px; right:15px; background:white; padding:10px 14px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:14px; cursor:pointer; }
         .route-info { 
             position:absolute; top:120px; right:15px; background:white; 
@@ -31,7 +35,8 @@
         👣 점자블록
     </div>
 
-    <div class="info">
+    <!-- 右上角提示文字（会智能隐藏） -->
+    <div id="instructionBox" class="info">
         👉 첫 번째 마커 → 시작점<br>
         👉 두 번째 마커 → 도착점
     </div>
@@ -61,7 +66,6 @@
             { id: 401, name: "중앙로 점자블록", type: "blind_road", lat: 35.8692, lng: 128.5934 }
         ];
 
-        // 获取用户真实位置
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
                 userLocation = [pos.coords.latitude, pos.coords.longitude];
@@ -88,6 +92,9 @@
         }
 
         function handleMarkerClick(item) {
+            // 点击标记后隐藏右上角提示
+            document.getElementById('instructionBox').style.display = 'none';
+
             if (!startPoint) {
                 startPoint = item;
                 L.popup().setLatLng([item.lat, item.lng]).setContent(`<b>✅ 시작점 설정</b><br>${item.name}`).openOn(map);
@@ -106,8 +113,6 @@
 
             const distanceMeters = map.distance([start.lat, start.lng], [end.lat, end.lng]);
             const distance = distanceMeters.toFixed(0);
-
-            // 简单时间估算（步行速度约 4km/h，轮椅约 3km/h）
             const walkingMinutes = Math.round(distanceMeters / 1000 / 4 * 60);
             const wheelchairMinutes = Math.round(distanceMeters / 1000 / 3 * 60);
 
@@ -123,28 +128,30 @@
             document.getElementById('clearBtn').style.display = 'block';
         }
 
-        // 清除路线（彻底重置）
+        // 清除路线（彻底重置 + 重新显示提示文字）
         document.getElementById('clearBtn').addEventListener('click', () => {
             if (currentLine) map.removeLayer(currentLine);
             currentLine = null;
             startPoint = null;
             document.getElementById('routeInfo').style.display = 'none';
             document.getElementById('clearBtn').style.display = 'none';
+            document.getElementById('instructionBox').style.display = 'block'; // 重新显示提示
             map.closePopup();
         });
 
-        // 点击路线信息面板也可清除（提升体验）
+        // 点击路线信息面板也可清除
         document.getElementById('routeInfo').addEventListener('click', () => {
             if (currentLine) map.removeLayer(currentLine);
             currentLine = null;
             startPoint = null;
             document.getElementById('routeInfo').style.display = 'none';
             document.getElementById('clearBtn').style.display = 'none';
+            document.getElementById('instructionBox').style.display = 'block';
             map.closePopup();
         });
 
         createMarkers();
-        console.log('✅ 路径规划阶段一完成（信息面板 + 时间估算 + 点击清除）');
+        console.log('✅ 路径规划阶段一最终优化版（智能隐藏提示 + 时间估算）');
     </script>
 </body>
 </html>
