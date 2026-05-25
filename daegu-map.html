@@ -98,8 +98,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <script>
-        console.log('H5地图启动');
-
         const map = L.map('map').setView([35.8714, 128.6014], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
@@ -140,8 +138,6 @@
         }
 
         function handleMarkerClick(item) {
-            console.log('标记被点击:', item.name);
-
             if (!startPoint) {
                 startPoint = item;
                 L.popup()
@@ -154,7 +150,6 @@
                     map.closePopup();
                     return;
                 }
-                console.log('开始绘制路线');
                 drawRoute(startPoint, item);
                 document.getElementById('instructionBox').style.display = 'none';
                 startPoint = null;
@@ -164,7 +159,6 @@
         function drawRoute(start, end) {
             if (currentLine) map.removeLayer(currentLine);
 
-            // 先画直线（保证能看到效果）
             currentLine = L.polyline([[start.lat, start.lng], [end.lat, end.lng]], {
                 color: '#3388ff', weight: 6, opacity: 0.9
             }).addTo(map);
@@ -190,14 +184,18 @@
         }
 
         function startFullNavigation() {
-            // 这里可以后续接入真实导航
-            alert('导航功能开发中...');
+            document.getElementById('routeSummary').style.display = 'none';
+            document.getElementById('clearBtn').style.display = 'none';
+            document.getElementById('legend').style.display = 'none';
+            document.getElementById('cancelNavBtn').style.display = 'block';
         }
 
         function cancelFullNavigation() {
             document.getElementById('cancelNavBtn').style.display = 'none';
             if (window.currentRouteStart && window.currentRouteEnd) {
                 document.getElementById('routeSummary').style.display = 'block';
+                document.getElementById('clearBtn').style.display = 'block';
+                document.getElementById('legend').style.display = 'block';
             }
         }
 
@@ -217,18 +215,90 @@
             window.currentRouteEnd = null;
         }
 
-        // 长按添加设施
+        // 长按地图添加设施
         map.on('contextmenu', function(e) {
-            // 省略添加逻辑，保持之前版本
-            console.log('长按添加触发');
+            pendingLatLng = e.latlng;
+            if (tempMarker) map.removeLayer(tempMarker);
+            tempMarker = L.marker(e.latlng, {
+                icon: L.divIcon({ html: '📍', iconSize: [30, 30] })
+            }).addTo(map);
+            document.getElementById('addForm').style.display = 'block';
+            document.getElementById('facilityName').focus();
         });
 
-        function confirmAdd() {}
-        function cancelAdd() {}
-        function startEditFacility(id) {}
-        function confirmEdit() {}
-        function cancelEdit() {}
-        function deleteFacility() {}
+        function confirmAdd() {
+            const type = document.getElementById('facilityType').value;
+            const name = document.getElementById('facilityName').value.trim() || '새 시설';
+            if (!pendingLatLng) return;
+
+            const newFacility = {
+                id: Date.now(),
+                name: name,
+                type: type,
+                lat: pendingLatLng.lat,
+                lng: pendingLatLng.lng
+            };
+
+            userAddedFacilities.push(newFacility);
+            localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
+            facilities.push(newFacility);
+            createMarkers();
+
+            document.getElementById('addForm').style.display = 'none';
+            if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+            pendingLatLng = null;
+        }
+
+        function cancelAdd() {
+            document.getElementById('addForm').style.display = 'none';
+            if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+            pendingLatLng = null;
+        }
+
+        function startEditFacility(id) {
+            const facility = facilities.find(f => f.id === id);
+            if (!facility) return;
+            editingFacilityId = id;
+            document.getElementById('editFacilityType').value = facility.type;
+            document.getElementById('editFacilityName').value = facility.name;
+            document.getElementById('editForm').style.display = 'block';
+        }
+
+        function confirmEdit() {
+            if (!editingFacilityId) return;
+            const newType = document.getElementById('editFacilityType').value;
+            const newName = document.getElementById('editFacilityName').value.trim();
+
+            const index = userAddedFacilities.findIndex(f => f.id === editingFacilityId);
+            if (index !== -1) {
+                userAddedFacilities[index].type = newType;
+                userAddedFacilities[index].name = newName;
+                localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
+            }
+            const facIndex = facilities.findIndex(f => f.id === editingFacilityId);
+            if (facIndex !== -1) {
+                facilities[facIndex].type = newType;
+                facilities[facIndex].name = newName;
+            }
+            document.getElementById('editForm').style.display = 'none';
+            createMarkers();
+            editingFacilityId = null;
+        }
+
+        function cancelEdit() {
+            document.getElementById('editForm').style.display = 'none';
+            editingFacilityId = null;
+        }
+
+        function deleteFacility() {
+            if (!editingFacilityId || !confirm('정말 삭제하시겠습니까?')) return;
+            userAddedFacilities = userAddedFacilities.filter(f => f.id !== editingFacilityId);
+            localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
+            facilities = facilities.filter(f => f.id !== editingFacilityId);
+            document.getElementById('editForm').style.display = 'none';
+            createMarkers();
+            editingFacilityId = null;
+        }
 
         document.getElementById('clearBtn').addEventListener('click', () => {
             clearCurrentRoute(true);
@@ -238,7 +308,6 @@
         });
 
         createMarkers();
-        console.log('地图初始化完成');
     </script>
 </body>
 </html>
