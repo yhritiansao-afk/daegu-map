@@ -4,14 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>대구 무장애 지도</title>
-    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-    
     <style>
         html, body, #map { margin:0; padding:0; width:100%; height:100vh; }
         .legend { position:absolute; bottom:15px; left:15px; background:white; padding:12px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:14px; line-height:1.8; }
-        .info { position:absolute; top:15px; right:15px; background:white; padding:10px 14px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.25); z-index:1000; font-size:13.5px; }
+        .info { position:absolute; top:15px; right:15px; background:white; padding:10px 14px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.25); z-index:1000; font-size:13.5px; transition: opacity 0.3s; }
         .control-btn { position:absolute; top:70px; right:15px; background:white; padding:10px 14px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:14px; cursor:pointer; }
         
         .route-summary {
@@ -22,18 +20,15 @@
         .route-summary .title { font-weight:bold; color:#222; margin-bottom:8px; }
         .route-summary .detail { color:#444; }
         .route-summary .distance { color:#3388ff; font-weight:600; }
-        
         .start-nav-btn {
-            margin-top:12px; width:100%; padding:10px; background:#3388ff; color:white; 
+            margin-top:12px; width:100%; padding:11px; background:#3388ff; color:white; 
             border:none; border-radius:8px; font-size:15px; font-weight:500; cursor:pointer;
         }
-        
         .cancel-nav-btn {
             position:absolute; bottom:20px; right:20px; background:#ff4757; color:white;
             padding:10px 18px; border-radius:25px; box-shadow:0 4px 12px rgba(0,0,0,0.3);
             z-index:1000; font-size:14px; display:none; cursor:pointer;
         }
-
         .add-form, .edit-form {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
@@ -74,10 +69,10 @@
         <button class="start-nav-btn" onclick="startFullNavigation()">시작 내비게이션</button>
     </div>
 
-    <!-- 取消导航按钮（右下角） -->
+    <!-- 右下角取消导航按钮 -->
     <div id="cancelNavBtn" class="cancel-nav-btn" onclick="cancelFullNavigation()">내비게이션 취소</div>
 
-    <!-- 添加/编辑表单 -->
+    <!-- 添加设施表单 -->
     <div id="addForm" class="add-form">
         <h3>시설 추가</h3>
         <label>시설 유형</label>
@@ -95,6 +90,7 @@
         </div>
     </div>
 
+    <!-- 编辑表单 -->
     <div id="editForm" class="edit-form">
         <h3>시설 수정</h3>
         <label>시설 유형</label>
@@ -140,6 +136,7 @@
 
         let facilities = [...defaultFacilities, ...userAddedFacilities];
 
+        // 获取用户真实位置
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
                 userLocation = [pos.coords.latitude, pos.coords.longitude];
@@ -179,14 +176,13 @@
         }
 
         function handleMarkerClick(item) {
-            document.getElementById('instructionBox').style.display = 'none';
-
             if (!startPoint) {
                 startPoint = item;
                 L.popup()
                     .setLatLng([item.lat, item.lng])
-                    .setContent(`<b>✅ 시작점 설정</b><br>${item.name}<br><small style="color:#888">다시 클릭하면 취소됩니다</small>`)
+                    .setContent(`<b>✅ 시작점 설정</b><br>${item.name}<br><small style="color:#888">다른 마커를 클릭하세요</small>`)
                     .openOn(map);
+                // 第一个点点击后不隐藏 instructionBox
             } else {
                 if (startPoint.id === item.id) {
                     startPoint = null;
@@ -194,13 +190,14 @@
                     return;
                 }
                 tryRealRouting(startPoint, item);
+                // 第二个点点击后才隐藏提示
+                document.getElementById('instructionBox').style.display = 'none';
                 startPoint = null;
             }
         }
 
-        // 尝试真实路线
         function tryRealRouting(start, end) {
-            clearCurrentRoute();
+            clearCurrentRoute(false);
 
             const startLatLng = L.latLng(start.lat, start.lng);
             const endLatLng = L.latLng(end.lat, end.lng);
@@ -224,28 +221,23 @@
                 }).addTo(map);
 
                 currentRoutingControl.on('routesfound', function(e) {
-                    const routes = e.routes;
-                    if (routes && routes.length > 0) {
-                        const summary = routes[0].summary;
-                        const distanceKm = (summary.totalDistance / 1000).toFixed(2);
-                        const timeMin = Math.round(summary.totalTime / 60);
+                    const summary = e.routes[0].summary;
+                    const distanceKm = (summary.totalDistance / 1000).toFixed(2);
+                    const timeMin = Math.round(summary.totalTime / 60);
 
-                        // 显示简洁摘要 + 开始导航按钮
-                        const summaryBox = document.getElementById('routeSummary');
-                        const detail = document.getElementById('routeSummaryDetail');
-                        detail.innerHTML = `
-                            <b>시작:</b> ${start.name}<br>
-                            <b>도착:</b> ${end.name}<br>
-                            <span class="distance">실제 거리: 약 ${distanceKm} km</span><br>
-                            <b>예상 소요:</b> 약 ${timeMin} 분
-                        `;
-                        summaryBox.style.display = 'block';
-                        document.getElementById('clearBtn').style.display = 'block';
-                        
-                        // 把起点终点信息存起来，方便开始导航时使用
-                        window.currentRouteStart = start;
-                        window.currentRouteEnd = end;
-                    }
+                    const summaryBox = document.getElementById('routeSummary');
+                    const detail = document.getElementById('routeSummaryDetail');
+                    detail.innerHTML = `
+                        <b>시작:</b> ${start.name}<br>
+                        <b>도착:</b> ${end.name}<br>
+                        <span class="distance">실제 거리: 약 ${distanceKm} km</span><br>
+                        <b>예상 소요:</b> 약 ${timeMin} 분
+                    `;
+                    summaryBox.style.display = 'block';
+                    document.getElementById('clearBtn').style.display = 'block';
+                    
+                    window.currentRouteStart = start;
+                    window.currentRouteEnd = end;
                 });
 
             } catch (err) {
@@ -254,7 +246,6 @@
             }
         }
 
-        // 直线回退方案
         function drawStraightLineFallback(start, end) {
             currentLine = L.polyline([[start.lat, start.lng], [end.lat, end.lng]], {
                 color: '#3388ff', weight: 6, opacity: 0.9
@@ -278,53 +269,128 @@
             document.getElementById('clearBtn').style.display = 'block';
         }
 
-        // 点击“开始导航”按钮
         function startFullNavigation() {
             if (!currentRoutingControl) return;
-
-            // 隐藏简洁摘要
             document.getElementById('routeSummary').style.display = 'none';
-            
-            // 显示完整的 Routing Machine 面板
-            // Routing Machine 默认会显示详细导航，这里我们让它保持显示
             document.getElementById('cancelNavBtn').style.display = 'block';
         }
 
-        // 取消导航
         function cancelFullNavigation() {
-            clearCurrentRoute();
-            document.getElementById('cancelNavBtn').style.display = 'none';
-            document.getElementById('instructionBox').style.display = 'block';
-            map.closePopup();
-        }
-
-        function clearCurrentRoute() {
-            if (currentLine) {
-                map.removeLayer(currentLine);
-                currentLine = null;
-            }
             if (currentRoutingControl) {
                 map.removeControl(currentRoutingControl);
                 currentRoutingControl = null;
             }
-            document.getElementById('routeSummary').style.display = 'none';
-            document.getElementById('clearBtn').style.display = 'none';
             document.getElementById('cancelNavBtn').style.display = 'none';
         }
 
-        // 清除按钮
+        function clearCurrentRoute(alsoHideInstruction = true) {
+            if (currentLine) { map.removeLayer(currentLine); currentLine = null; }
+            if (currentRoutingControl) { map.removeControl(currentRoutingControl); currentRoutingControl = null; }
+            
+            document.getElementById('routeSummary').style.display = 'none';
+            document.getElementById('clearBtn').style.display = 'none';
+            document.getElementById('cancelNavBtn').style.display = 'none';
+            
+            if (alsoHideInstruction) {
+                document.getElementById('instructionBox').style.display = 'none';
+            }
+        }
+
+        // 长按地图添加设施
+        map.on('contextmenu', function(e) {
+            pendingLatLng = e.latlng;
+            if (tempMarker) map.removeLayer(tempMarker);
+            tempMarker = L.marker(e.latlng, {
+                icon: L.divIcon({ html: '📍', iconSize: [30, 30] })
+            }).addTo(map);
+            document.getElementById('addForm').style.display = 'block';
+            document.getElementById('facilityName').focus();
+        });
+
+        function confirmAdd() {
+            const type = document.getElementById('facilityType').value;
+            const name = document.getElementById('facilityName').value.trim() || '새 시설';
+            if (!pendingLatLng) return;
+
+            const newFacility = {
+                id: Date.now(),
+                name: name,
+                type: type,
+                lat: pendingLatLng.lat,
+                lng: pendingLatLng.lng
+            };
+
+            userAddedFacilities.push(newFacility);
+            localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
+            facilities.push(newFacility);
+            createMarkers();
+
+            document.getElementById('addForm').style.display = 'none';
+            if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+            pendingLatLng = null;
+        }
+
+        function cancelAdd() {
+            document.getElementById('addForm').style.display = 'none';
+            if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+            pendingLatLng = null;
+        }
+
+        function startEditFacility(id) {
+            const facility = facilities.find(f => f.id === id);
+            if (!facility) return;
+            editingFacilityId = id;
+            document.getElementById('editFacilityType').value = facility.type;
+            document.getElementById('editFacilityName').value = facility.name;
+            document.getElementById('editForm').style.display = 'block';
+        }
+
+        function confirmEdit() {
+            if (!editingFacilityId) return;
+            const newType = document.getElementById('editFacilityType').value;
+            const newName = document.getElementById('editFacilityName').value.trim();
+
+            const index = userAddedFacilities.findIndex(f => f.id === editingFacilityId);
+            if (index !== -1) {
+                userAddedFacilities[index].type = newType;
+                userAddedFacilities[index].name = newName;
+                localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
+            }
+            const facIndex = facilities.findIndex(f => f.id === editingFacilityId);
+            if (facIndex !== -1) {
+                facilities[facIndex].type = newType;
+                facilities[facIndex].name = newName;
+            }
+            document.getElementById('editForm').style.display = 'none';
+            createMarkers();
+            editingFacilityId = null;
+        }
+
+        function cancelEdit() {
+            document.getElementById('editForm').style.display = 'none';
+            editingFacilityId = null;
+        }
+
+        function deleteFacility() {
+            if (!editingFacilityId || !confirm('정말 삭제하시겠습니까?')) return;
+            userAddedFacilities = userAddedFacilities.filter(f => f.id !== editingFacilityId);
+            localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
+            facilities = facilities.filter(f => f.id !== editingFacilityId);
+            document.getElementById('editForm').style.display = 'none';
+            createMarkers();
+            editingFacilityId = null;
+        }
+
+        // 清除路线按钮
         document.getElementById('clearBtn').addEventListener('click', () => {
-            clearCurrentRoute();
+            clearCurrentRoute(true);
             startPoint = null;
             document.getElementById('instructionBox').style.display = 'block';
             map.closePopup();
         });
 
-        // 长按添加设施等其他功能保持不变（省略重复代码，实际使用时保留之前完整版）
-        // ...（添加、编辑、删除功能代码和之前版本一致）
-
         createMarkers();
-        console.log('✅ 导航流程优化版已加载');
+        console.log('✅ 完整优化版已加载（流程按要求调整）');
     </script>
 </body>
 </html>
