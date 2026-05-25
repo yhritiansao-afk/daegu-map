@@ -12,11 +12,12 @@
         .control-btn { position:absolute; top:70px; right:15px; background:white; padding:10px 14px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:14px; cursor:pointer; }
         .route-info { 
             position:absolute; top:120px; right:15px; background:white; 
-            padding:12px 16px; border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,0.25); 
-            z-index:1000; font-size:13.5px; min-width:180px; display:none;
+            padding:14px 18px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.2); 
+            z-index:1000; font-size:14px; min-width:200px; display:none; line-height:1.7;
         }
-        .route-info .title { font-weight:bold; margin-bottom:6px; color:#333; }
-        .route-info .detail { color:#555; line-height:1.6; }
+        .route-info .title { font-weight:bold; color:#222; margin-bottom:8px; }
+        .route-info .detail { color:#444; }
+        .route-info .distance { color:#3388ff; font-weight:600; }
     </style>
 </head>
 <body>
@@ -37,7 +38,6 @@
 
     <div id="clearBtn" class="control-btn" style="display:none;">🗑️ 경로 지우기</div>
     
-    <!-- 新增：路线信息面板 -->
     <div id="routeInfo" class="route-info">
         <div class="title">📍 경로 정보</div>
         <div class="detail" id="routeDetail"></div>
@@ -59,7 +59,6 @@
             { id: 201, name: "경북대학교 중앙도서관 무장애 엘리베이터", type: "elevator", lat: 35.8851, lng: 128.6053 },
             { id: 301, name: "동성로 무장애 경사로", type: "ramp", lat: 35.8675, lng: 128.5988 },
             { id: 401, name: "중앙로 점자블록", type: "blind_road", lat: 35.8692, lng: 128.5934 }
-            // 后续可以继续添加真实数据
         ];
 
         // 获取用户真实位置
@@ -67,7 +66,6 @@
             navigator.geolocation.getCurrentPosition(pos => {
                 userLocation = [pos.coords.latitude, pos.coords.longitude];
                 map.setView(userLocation, 14);
-
                 if (userMarker) map.removeLayer(userMarker);
                 userMarker = L.marker(userLocation, {
                     icon: L.divIcon({ html: '📍', iconSize: [30, 30] })
@@ -80,11 +78,9 @@
         function createMarkers() {
             allMarkers.forEach(m => map.removeLayer(m));
             allMarkers = [];
-
             facilities.forEach(item => {
                 const emoji = { toilet: '🚽', elevator: '🪜', ramp: '♿', blind_road: '👣' }[item.type] || '📍';
                 const marker = L.marker([item.lat, item.lng]).addTo(map);
-                
                 marker.bindPopup(`<b>${item.name}</b><br>${emoji}`);
                 marker.on('click', () => handleMarkerClick(item));
                 allMarkers.push(marker);
@@ -93,37 +89,37 @@
 
         function handleMarkerClick(item) {
             if (!startPoint) {
-                // 设置起点
                 startPoint = item;
                 L.popup().setLatLng([item.lat, item.lng]).setContent(`<b>✅ 시작점 설정</b><br>${item.name}`).openOn(map);
             } else {
-                // 绘制路线
                 drawRoute(startPoint, item);
                 startPoint = null;
             }
         }
 
         function drawRoute(start, end) {
-            // 清除旧路线
             if (currentLine) map.removeLayer(currentLine);
 
             currentLine = L.polyline([[start.lat, start.lng], [end.lat, end.lng]], {
                 color: '#3388ff', weight: 6, opacity: 0.9
             }).addTo(map);
 
-            const distance = map.distance([start.lat, start.lng], [end.lat, end.lng]).toFixed(0);
+            const distanceMeters = map.distance([start.lat, start.lng], [end.lat, end.lng]);
+            const distance = distanceMeters.toFixed(0);
 
-            // 显示路线信息面板
+            // 简单时间估算（步行速度约 4km/h，轮椅约 3km/h）
+            const walkingMinutes = Math.round(distanceMeters / 1000 / 4 * 60);
+            const wheelchairMinutes = Math.round(distanceMeters / 1000 / 3 * 60);
+
             const routeInfo = document.getElementById('routeInfo');
             const routeDetail = document.getElementById('routeDetail');
             routeDetail.innerHTML = `
                 <b>시작:</b> ${start.name}<br>
                 <b>도착:</b> ${end.name}<br>
-                <b>직선 거리:</b> 약 ${distance} 미터
+                <span class="distance">직선 거리: 약 ${distance} 미터</span><br>
+                <b>예상 소요:</b> 도보 약 ${walkingMinutes}분 / 휠체어 약 ${wheelchairMinutes}분
             `;
             routeInfo.style.display = 'block';
-
-            // 显示清除按钮
             document.getElementById('clearBtn').style.display = 'block';
         }
 
@@ -132,17 +128,23 @@
             if (currentLine) map.removeLayer(currentLine);
             currentLine = null;
             startPoint = null;
-
-            // 隐藏信息面板和清除按钮
             document.getElementById('routeInfo').style.display = 'none';
             document.getElementById('clearBtn').style.display = 'none';
+            map.closePopup();
+        });
 
+        // 点击路线信息面板也可清除（提升体验）
+        document.getElementById('routeInfo').addEventListener('click', () => {
+            if (currentLine) map.removeLayer(currentLine);
+            currentLine = null;
+            startPoint = null;
+            document.getElementById('routeInfo').style.display = 'none';
+            document.getElementById('clearBtn').style.display = 'none';
             map.closePopup();
         });
 
         createMarkers();
-
-        console.log('✅ 路径规划升级版已加载（彻底重置 + 信息面板）');
+        console.log('✅ 路径规划阶段一完成（信息面板 + 时间估算 + 点击清除）');
     </script>
 </body>
 </html>
