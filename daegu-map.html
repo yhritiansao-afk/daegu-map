@@ -7,21 +7,16 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         html, body, #map { margin:0; padding:0; width:100%; height:100vh; }
-        .legend { 
-            position:absolute; bottom:15px; left:15px; background:white; 
-            padding:12px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); 
-            z-index:1000; font-size:14px; line-height:1.8; 
+        .legend { position:absolute; bottom:15px; left:15px; background:white; padding:12px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:14px; line-height:1.8; }
+        .info { position:absolute; top:15px; right:15px; background:white; padding:10px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:13.5px; }
+        .control-btn { position:absolute; top:70px; right:15px; background:white; padding:10px 14px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:14px; cursor:pointer; }
+        .route-info { 
+            position:absolute; top:120px; right:15px; background:white; 
+            padding:12px 16px; border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,0.25); 
+            z-index:1000; font-size:13.5px; min-width:180px; display:none;
         }
-        .info { 
-            position:absolute; top:15px; right:15px; background:white; 
-            padding:10px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); 
-            z-index:1000; font-size:13.5px; 
-        }
-        .control-btn { 
-            position:absolute; top:70px; right:15px; background:white; 
-            padding:10px 14px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); 
-            z-index:1000; font-size:14px; cursor:pointer; 
-        }
+        .route-info .title { font-weight:bold; margin-bottom:6px; color:#333; }
+        .route-info .detail { color:#555; line-height:1.6; }
     </style>
 </head>
 <body>
@@ -41,6 +36,12 @@
     </div>
 
     <div id="clearBtn" class="control-btn" style="display:none;">🗑️ 경로 지우기</div>
+    
+    <!-- 新增：路线信息面板 -->
+    <div id="routeInfo" class="route-info">
+        <div class="title">📍 경로 정보</div>
+        <div class="detail" id="routeDetail"></div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
@@ -53,26 +54,24 @@
         let userMarker = null;
 
         const facilities = [
-          { id:1, name: "대구역 무장애 화장실", type: "toilet", lat: 35.8714, lng: 128.6014 },
-          { id:2, name: "경북대학교 무장애 엘리베이터", type: "elevator", lat: 35.880, lng: 128.590 },
-          { id:3, name: "동성로 무장애 경사로", type: "ramp", lat: 35.860, lng: 128.610 },
-          { id:4, name: "중앙로 점자블록", type: "blind_road", lat: 35.865, lng: 128.595 }
+            { id: 101, name: "대구역 무장애 화장실", type: "toilet", lat: 35.8714, lng: 128.6014 },
+            { id: 102, name: "동성로 무장애 화장실", type: "toilet", lat: 35.8668, lng: 128.5972 },
+            { id: 201, name: "경북대학교 중앙도서관 무장애 엘리베이터", type: "elevator", lat: 35.8851, lng: 128.6053 },
+            { id: 301, name: "동성로 무장애 경사로", type: "ramp", lat: 35.8675, lng: 128.5988 },
+            { id: 401, name: "중앙로 점자블록", type: "blind_road", lat: 35.8692, lng: 128.5934 }
+            // 后续可以继续添加真实数据
         ];
 
-        // 获取用户真实位置并居中
+        // 获取用户真实位置
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
                 userLocation = [pos.coords.latitude, pos.coords.longitude];
-                console.log('✅ 当前位置获取成功:', userLocation);
-                
-                map.setView(userLocation, 14);   // 自动居中并稍微放大
+                map.setView(userLocation, 14);
 
                 if (userMarker) map.removeLayer(userMarker);
                 userMarker = L.marker(userLocation, {
-                    icon: L.divIcon({ className: '', html: '📍', iconSize: [30, 30] })
+                    icon: L.divIcon({ html: '📍', iconSize: [30, 30] })
                 }).addTo(map).bindPopup('<b>📍 현재 위치</b>');
-            }, () => {
-                console.log('⚠️ 位置获取失败，使用默认位置');
             });
         }
 
@@ -94,15 +93,18 @@
 
         function handleMarkerClick(item) {
             if (!startPoint) {
+                // 设置起点
                 startPoint = item;
                 L.popup().setLatLng([item.lat, item.lng]).setContent(`<b>✅ 시작점 설정</b><br>${item.name}`).openOn(map);
             } else {
+                // 绘制路线
                 drawRoute(startPoint, item);
                 startPoint = null;
             }
         }
 
         function drawRoute(start, end) {
+            // 清除旧路线
             if (currentLine) map.removeLayer(currentLine);
 
             currentLine = L.polyline([[start.lat, start.lng], [end.lat, end.lng]], {
@@ -110,27 +112,37 @@
             }).addTo(map);
 
             const distance = map.distance([start.lat, start.lng], [end.lat, end.lng]).toFixed(0);
-            
-            L.popup()
-                .setLatLng([(start.lat + end.lat)/2, (start.lng + end.lng)/2])
-                .setContent(`<b>직선 거리 약 ${distance} 미터</b><br>시작: ${start.name}<br>도착: ${end.name}`)
-                .openOn(map);
 
+            // 显示路线信息面板
+            const routeInfo = document.getElementById('routeInfo');
+            const routeDetail = document.getElementById('routeDetail');
+            routeDetail.innerHTML = `
+                <b>시작:</b> ${start.name}<br>
+                <b>도착:</b> ${end.name}<br>
+                <b>직선 거리:</b> 약 ${distance} 미터
+            `;
+            routeInfo.style.display = 'block';
+
+            // 显示清除按钮
             document.getElementById('clearBtn').style.display = 'block';
         }
 
-        // 清除路线（彻底清除）
+        // 清除路线（彻底重置）
         document.getElementById('clearBtn').addEventListener('click', () => {
             if (currentLine) map.removeLayer(currentLine);
             currentLine = null;
             startPoint = null;
-            map.closePopup();                    // 关闭所有弹窗
+
+            // 隐藏信息面板和清除按钮
+            document.getElementById('routeInfo').style.display = 'none';
             document.getElementById('clearBtn').style.display = 'none';
+
+            map.closePopup();
         });
 
         createMarkers();
 
-        console.log('✅ 最终优化版：真实定位居中 + 清除按钮彻底清理');
+        console.log('✅ 路径规划升级版已加载（彻底重置 + 信息面板）');
     </script>
 </body>
 </html>
