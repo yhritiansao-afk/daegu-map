@@ -190,7 +190,7 @@
             const endLatLng = L.latLng(end.lat, end.lng);
 
             if (typeof L.Routing === 'undefined') {
-                drawStraightLineFallback(start, end, true);
+                drawStraightLineFallback(start, end);
                 return;
             }
 
@@ -205,9 +205,9 @@
                     lineOptions: {
                         styles: [{ color: '#3388ff', weight: 6, opacity: 0.85 }]
                     }
-                });
+                }).addTo(map);
 
-                // 监听路线成功事件
+                // 监听到路线后，立即隐藏详细面板，只显示我们自己的摘要
                 currentRoutingControl.on('routesfound', function(e) {
                     const routes = e.routes;
                     if (routes && routes.length > 0) {
@@ -215,14 +215,11 @@
                         const distanceKm = (summary.totalDistance / 1000).toFixed(2);
                         const timeMin = Math.round(summary.totalTime / 60);
 
-                        // 画真实路线（从返回的 coordinates 里取）
-                        const coords = routes[0].coordinates;
-                        if (currentLine) map.removeLayer(currentLine);
-                        currentLine = L.polyline(coords, {
-                            color: '#3388ff', weight: 6, opacity: 0.9
-                        }).addTo(map);
+                        // 隐藏 Routing Machine 自带的详细面板
+                        const container = currentRoutingControl.getContainer();
+                        if (container) container.style.display = 'none';
 
-                        // 显示简洁摘要
+                        // 显示我们自己的简洁摘要
                         const summaryBox = document.getElementById('routeSummary');
                         const detail = document.getElementById('routeSummaryDetail');
                         detail.innerHTML = `
@@ -240,11 +237,12 @@
                 });
 
             } catch (err) {
-                drawStraightLineFallback(start, end, true);
+                console.error(err);
+                drawStraightLineFallback(start, end);
             }
         }
 
-        function drawStraightLineFallback(start, end, showFailTip = false) {
+        function drawStraightLineFallback(start, end) {
             currentLine = L.polyline([[start.lat, start.lng], [end.lat, end.lng]], {
                 color: '#3388ff', weight: 6, opacity: 0.9
             }).addTo(map);
@@ -261,7 +259,6 @@
                 <b>도착:</b> ${end.name}<br>
                 <span class="distance">직선 거리: 약 ${distance} 미터</span><br>
                 <b>예상 소요:</b> 도보 약 ${walkingMinutes}분 / 휠체어 약 ${wheelchairMinutes}분
-                ${showFailTip ? '<br><small style="color:#ff6b6b;">(真实路线加载失败)</small>' : ''}
             `;
             summaryBox.style.display = 'block';
             document.getElementById('clearBtn').style.display = 'block';
@@ -270,20 +267,22 @@
         function startFullNavigation() {
             if (!currentRoutingControl) return;
             
+            // 隐藏简洁摘要
             document.getElementById('routeSummary').style.display = 'none';
             document.getElementById('clearBtn').style.display = 'none';
             document.getElementById('legend').style.display = 'none';
             
-            // 这时才把 RoutingControl 加到地图，显示详细导航面板
-            currentRoutingControl.addTo(map);
+            // 显示 Routing Machine 的详细导航面板
+            const container = currentRoutingControl.getContainer();
+            if (container) container.style.display = 'block';
             
             document.getElementById('cancelNavBtn').style.display = 'block';
         }
 
         function cancelFullNavigation() {
             if (currentRoutingControl) {
-                map.removeControl(currentRoutingControl);
-                currentRoutingControl = null;
+                const container = currentRoutingControl.getContainer();
+                if (container) container.style.display = 'none';
             }
             document.getElementById('cancelNavBtn').style.display = 'none';
             
@@ -296,7 +295,10 @@
 
         function clearCurrentRoute(alsoHideInstruction = true) {
             if (currentLine) { map.removeLayer(currentLine); currentLine = null; }
-            if (currentRoutingControl) { map.removeControl(currentRoutingControl); currentRoutingControl = null; }
+            if (currentRoutingControl) { 
+                map.removeControl(currentRoutingControl); 
+                currentRoutingControl = null; 
+            }
             
             document.getElementById('routeSummary').style.display = 'none';
             document.getElementById('clearBtn').style.display = 'none';
@@ -404,7 +406,7 @@
         });
 
         createMarkers();
-        console.log('✅ 最终修复版已加载（真实路线 + 流程控制）');
+        console.log('✅ 稳定版已加载');
     </script>
 </body>
 </html>
