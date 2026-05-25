@@ -22,9 +22,7 @@
         }
         .add-form h3, .edit-form h3 { margin: 0 0 16px 0; text-align: center; }
         .add-form label, .edit-form label { display: block; margin: 10px 0 4px; font-size: 14px; }
-        .add-form input, .add-form select, .edit-form input, .edit-form select { 
-            width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; 
-        }
+        .add-form input, .add-form select, .edit-form input, .edit-form select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
         .btn-group { display: flex; gap: 10px; margin-top: 16px; }
         .btn-group button { flex: 1; padding: 10px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
         .btn-cancel { background: #eee; }
@@ -102,7 +100,7 @@
         let userMarker = null;
         let tempMarker = null;
         let pendingLatLng = null;
-        let editingFacilityId = null; // 当前正在编辑的设施ID
+        let editingFacilityId = null;
 
         let userAddedFacilities = JSON.parse(localStorage.getItem('userAddedFacilities') || '[]');
         const defaultFacilities = [
@@ -115,7 +113,6 @@
 
         let facilities = [...defaultFacilities, ...userAddedFacilities];
 
-        // 获取用户真实位置
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
                 userLocation = [pos.coords.latitude, pos.coords.longitude];
@@ -137,18 +134,18 @@
                 const emoji = { toilet: '🚽', elevator: '🪜', ramp: '♿', blind_road: '👣' }[item.type] || '📍';
                 const marker = L.marker([item.lat, item.lng]).addTo(map);
                 
-                // 判断是否是用户添加的设施
                 const isUserAdded = userAddedFacilities.some(f => f.id === item.id);
                 
                 if (isUserAdded) {
-                    // 用户添加的设施：点击后弹出编辑/删除选项
-                    marker.bindPopup(`
-                        <b>${item.name}</b><br>${emoji}<br><br>
-                        <button onclick="startEditFacility(${item.id})" style="margin-right:8px;padding:6px 12px;background:#3388ff;color:white;border:none;border-radius:4px;">编辑</button>
-                        <button onclick="deleteFacilityById(${item.id})" style="padding:6px 12px;background:#ff4757;color:white;border:none;border-radius:4px;">삭제</button>
-                    `);
+                    // 用户添加的点：显示基本信息 + 长按提示
+                    marker.bindPopup(`<b>${item.name}</b><br>${emoji}<br><small style="color:#888">(길게 누르면 수정/삭제)</small>`);
+                    
+                    // 长按触发编辑删除菜单
+                    marker.on('contextmenu', (e) => {
+                        e.originalEvent.preventDefault();
+                        startEditFacility(item.id);
+                    });
                 } else {
-                    // 默认设施：只允许用于路径规划
                     marker.bindPopup(`<b>${item.name}</b><br>${emoji}`);
                 }
                 
@@ -191,7 +188,7 @@
             document.getElementById('clearBtn').style.display = 'block';
         }
 
-        // 长按地图添加设施
+        // 长按地图添加新设施
         map.on('contextmenu', function(e) {
             pendingLatLng = e.latlng;
             if (tempMarker) map.removeLayer(tempMarker);
@@ -233,7 +230,7 @@
             pendingLatLng = null;
         }
 
-        // 开始编辑设施
+        // 编辑功能
         function startEditFacility(id) {
             const facility = facilities.find(f => f.id === id);
             if (!facility) return;
@@ -250,7 +247,6 @@
             const newType = document.getElementById('editFacilityType').value;
             const newName = document.getElementById('editFacilityName').value.trim();
 
-            // 更新 userAddedFacilities
             const index = userAddedFacilities.findIndex(f => f.id === editingFacilityId);
             if (index !== -1) {
                 userAddedFacilities[index].type = newType;
@@ -258,7 +254,6 @@
                 localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
             }
 
-            // 更新 facilities 并重新渲染
             const facIndex = facilities.findIndex(f => f.id === editingFacilityId);
             if (facIndex !== -1) {
                 facilities[facIndex].type = newType;
@@ -275,12 +270,12 @@
             editingFacilityId = null;
         }
 
-        function deleteFacilityById(id) {
-            if (!confirm('정말 삭제하시겠습니까?')) return;
+        function deleteFacility() {
+            if (!editingFacilityId || !confirm('정말 삭제하시겠습니까?')) return;
 
-            userAddedFacilities = userAddedFacilities.filter(f => f.id !== id);
+            userAddedFacilities = userAddedFacilities.filter(f => f.id !== editingFacilityId);
             localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
-            facilities = facilities.filter(f => f.id !== id);
+            facilities = facilities.filter(f => f.id !== editingFacilityId);
 
             document.getElementById('editForm').style.display = 'none';
             createMarkers();
@@ -309,7 +304,7 @@
         });
 
         createMarkers();
-        console.log('✅ 编辑和删除功能已添加');
+        console.log('✅ 交互逻辑已优化（单击路径规划，长按编辑删除）');
     </script>
 </body>
 </html>
