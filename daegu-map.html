@@ -25,9 +25,9 @@
             border:none; border-radius:8px; font-size:15px; font-weight:500; cursor:pointer;
         }
         .cancel-nav-btn {
-            position:absolute; bottom:20px; right:20px; background:#ff4757; color:white;
-            padding:10px 18px; border-radius:25px; box-shadow:0 4px 12px rgba(0,0,0,0.3);
-            z-index:1000; font-size:14px; display:none; cursor:pointer;
+            position:absolute; bottom:25px; left:50%; transform:translateX(-50%); background:#ff4757; color:white;
+            padding:10px 24px; border-radius:25px; box-shadow:0 4px 12px rgba(0,0,0,0.3);
+            z-index:1000; font-size:15px; display:none; cursor:pointer; white-space:nowrap;
         }
         .add-form, .edit-form {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -54,17 +54,17 @@
 
     <div id="clearBtn" class="control-btn" style="display:none;">🗑️ 경로 지우기</div>
     
-    <!-- 简洁摘要 + 开始导航按钮 -->
+    <!-- 简洁路线摘要 + 开始导航按钮 -->
     <div id="routeSummary" class="route-summary">
         <div class="title">📍 경로 정보</div>
         <div class="detail" id="routeSummaryDetail"></div>
         <button class="start-nav-btn" onclick="startFullNavigation()">시작 내비게이션</button>
     </div>
 
-    <!-- 右下角取消导航按钮 -->
+    <!-- 底部取消导航按钮 -->
     <div id="cancelNavBtn" class="cancel-nav-btn" onclick="cancelFullNavigation()">내비게이션 취소</div>
 
-    <!-- 添加表单 -->
+    <!-- 添加设施表单 -->
     <div id="addForm" class="add-form">
         <h3>시설 추가</h3>
         <label>시설 유형</label>
@@ -180,7 +180,7 @@
                     map.closePopup();
                     return;
                 }
-                // 点击第二个点后，显示简洁摘要 + 开始导航按钮
+                // 点击第二个点：只显示简洁摘要 + 开始导航按钮
                 tryRealRouting(startPoint, item);
                 document.getElementById('instructionBox').style.display = 'none';
                 startPoint = null;
@@ -188,7 +188,7 @@
         }
 
         function tryRealRouting(start, end) {
-            clearCurrentRoute(false); // 只清除旧的，不隐藏 instructionBox
+            clearCurrentRoute(false);
 
             const startLatLng = L.latLng(start.lat, start.lng);
             const endLatLng = L.latLng(end.lat, end.lng);
@@ -216,7 +216,7 @@
                     const distanceKm = (summary.totalDistance / 1000).toFixed(2);
                     const timeMin = Math.round(summary.totalTime / 60);
 
-                    // 只显示简洁摘要 + 开始导航按钮（不自动显示详细面板）
+                    // 只显示简洁摘要 + 开始导航按钮
                     const summaryBox = document.getElementById('routeSummary');
                     const detail = document.getElementById('routeSummaryDetail');
                     detail.innerHTML = `
@@ -260,20 +260,18 @@
             document.getElementById('clearBtn').style.display = 'block';
         }
 
-        // 点击蓝色“开始导航”按钮 → 显示完整 Routing Machine 面板
+        // 点击蓝色“开始导航”按钮
         function startFullNavigation() {
             if (!currentRoutingControl) return;
             
             // 隐藏简洁摘要
             document.getElementById('routeSummary').style.display = 'none';
             
-            // 显示右下角取消按钮
+            // 显示底部取消导航按钮
             document.getElementById('cancelNavBtn').style.display = 'block';
-            
-            // Routing Machine 面板默认会显示，这里我们确保它可见
         }
 
-        // 点击“取消导航” → 只隐藏详细面板，保留路线线
+        // 点击“取消导航” —— 只隐藏详细面板，保留路线
         function cancelFullNavigation() {
             if (currentRoutingControl) {
                 map.removeControl(currentRoutingControl);
@@ -281,8 +279,12 @@
             }
             document.getElementById('cancelNavBtn').style.display = 'none';
             
-            // 注意：这里不调用 clearCurrentRoute，所以路线线会保留
-            // 用户可以用“경로 지우기”按钮来清除路线
+            // 重新显示简洁摘要 + 开始导航按钮（让用户可以重新开始导航）
+            if (window.currentRouteStart && window.currentRouteEnd) {
+                const summaryBox = document.getElementById('routeSummary');
+                // 这里可以重新填充摘要内容（简化处理）
+                summaryBox.style.display = 'block';
+            }
         }
 
         function clearCurrentRoute(alsoHideInstruction = true) {
@@ -296,6 +298,9 @@
             if (alsoHideInstruction) {
                 document.getElementById('instructionBox').style.display = 'none';
             }
+            
+            window.currentRouteStart = null;
+            window.currentRouteEnd = null;
         }
 
         // 长按地图添加设施
@@ -392,7 +397,7 @@
         });
 
         createMarkers();
-        console.log('✅ 最终优化版已加载（严格按你的流程）');
+        console.log('✅ 最终完整版已加载（严格按你的流程）');
     </script>
 </body>
 </html>
