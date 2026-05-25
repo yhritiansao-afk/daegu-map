@@ -39,7 +39,7 @@
 <body>
     <div id="map"></div>
 
-    <div class="legend">
+    <div class="legend" id="legend">
         <strong>🗺️ 범례</strong><br>
         🚽 무장애 화장실<br>
         🪜 무장애 엘리베이터<br>
@@ -264,14 +264,16 @@
         function startFullNavigation() {
             if (!currentRoutingControl) return;
             
-            // 隐藏简洁摘要
+            // 隐藏简洁摘要和清除按钮、图例
             document.getElementById('routeSummary').style.display = 'none';
+            document.getElementById('clearBtn').style.display = 'none';
+            document.getElementById('legend').style.display = 'none';
             
             // 显示底部取消导航按钮
             document.getElementById('cancelNavBtn').style.display = 'block';
         }
 
-        // 点击“取消导航” —— 只隐藏详细面板，保留路线
+        // 点击“取消导航” —— 只隐藏详细面板，保留路线，重新显示摘要
         function cancelFullNavigation() {
             if (currentRoutingControl) {
                 map.removeControl(currentRoutingControl);
@@ -279,11 +281,11 @@
             }
             document.getElementById('cancelNavBtn').style.display = 'none';
             
-            // 重新显示简洁摘要 + 开始导航按钮（让用户可以重新开始导航）
+            // 重新显示简洁摘要 + 开始导航按钮 + 清除按钮 + 图例
             if (window.currentRouteStart && window.currentRouteEnd) {
-                const summaryBox = document.getElementById('routeSummary');
-                // 这里可以重新填充摘要内容（简化处理）
-                summaryBox.style.display = 'block';
+                document.getElementById('routeSummary').style.display = 'block';
+                document.getElementById('clearBtn').style.display = 'block';
+                document.getElementById('legend').style.display = 'block';
             }
         }
 
@@ -294,6 +296,7 @@
             document.getElementById('routeSummary').style.display = 'none';
             document.getElementById('clearBtn').style.display = 'none';
             document.getElementById('cancelNavBtn').style.display = 'none';
+            document.getElementById('legend').style.display = 'block';
             
             if (alsoHideInstruction) {
                 document.getElementById('instructionBox').style.display = 'none';
