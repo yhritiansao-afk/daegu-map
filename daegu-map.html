@@ -9,7 +9,7 @@
     <style>
         html, body, #map { margin:0; padding:0; width:100%; height:100vh; }
         .legend { position:absolute; bottom:15px; left:15px; background:white; padding:12px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:14px; line-height:1.8; }
-        .info { position:absolute; top:15px; right:15px; background:white; padding:10px 14px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.25); z-index:1000; font-size:13.5px; transition: opacity 0.3s; }
+        .info { position:absolute; top:15px; right:15px; background:white; padding:10px 14px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.25); z-index:1000; font-size:13.5px; }
         .control-btn { position:absolute; top:70px; right:15px; background:white; padding:10px 14px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:14px; cursor:pointer; }
         
         .route-summary {
@@ -34,14 +34,6 @@
             background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             z-index: 2000; width: 260px; display: none;
         }
-        .add-form h3, .edit-form h3 { margin: 0 0 16px 0; text-align: center; }
-        .add-form label, .edit-form label { display: block; margin: 10px 0 4px; font-size: 14px; }
-        .add-form input, .add-form select, .edit-form input, .edit-form select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
-        .btn-group { display: flex; gap: 10px; margin-top: 16px; }
-        .btn-group button { flex: 1; padding: 10px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
-        .btn-cancel { background: #eee; }
-        .btn-confirm { background: #3388ff; color: white; }
-        .btn-danger { background: #ff4757; color: white; }
     </style>
 </head>
 <body>
@@ -62,7 +54,7 @@
 
     <div id="clearBtn" class="control-btn" style="display:none;">🗑️ 경로 지우기</div>
     
-    <!-- 简洁路线摘要 + 开始导航按钮 -->
+    <!-- 简洁摘要 + 开始导航按钮 -->
     <div id="routeSummary" class="route-summary">
         <div class="title">📍 경로 정보</div>
         <div class="detail" id="routeSummaryDetail"></div>
@@ -72,7 +64,7 @@
     <!-- 右下角取消导航按钮 -->
     <div id="cancelNavBtn" class="cancel-nav-btn" onclick="cancelFullNavigation()">내비게이션 취소</div>
 
-    <!-- 添加设施表单 -->
+    <!-- 添加表单 -->
     <div id="addForm" class="add-form">
         <h3>시설 추가</h3>
         <label>시설 유형</label>
@@ -182,27 +174,26 @@
                     .setLatLng([item.lat, item.lng])
                     .setContent(`<b>✅ 시작점 설정</b><br>${item.name}<br><small style="color:#888">다른 마커를 클릭하세요</small>`)
                     .openOn(map);
-                // 第一个点点击后不隐藏 instructionBox
             } else {
                 if (startPoint.id === item.id) {
                     startPoint = null;
                     map.closePopup();
                     return;
                 }
+                // 点击第二个点后，显示简洁摘要 + 开始导航按钮
                 tryRealRouting(startPoint, item);
-                // 第二个点点击后才隐藏提示
                 document.getElementById('instructionBox').style.display = 'none';
                 startPoint = null;
             }
         }
 
         function tryRealRouting(start, end) {
-            clearCurrentRoute(false);
+            clearCurrentRoute(false); // 只清除旧的，不隐藏 instructionBox
 
             const startLatLng = L.latLng(start.lat, start.lng);
             const endLatLng = L.latLng(end.lat, end.lng);
 
-            if (typeof L.Routing === 'undefined' || !L.Routing.control) {
+            if (typeof L.Routing === 'undefined') {
                 drawStraightLineFallback(start, end);
                 return;
             }
@@ -225,6 +216,7 @@
                     const distanceKm = (summary.totalDistance / 1000).toFixed(2);
                     const timeMin = Math.round(summary.totalTime / 60);
 
+                    // 只显示简洁摘要 + 开始导航按钮（不自动显示详细面板）
                     const summaryBox = document.getElementById('routeSummary');
                     const detail = document.getElementById('routeSummaryDetail');
                     detail.innerHTML = `
@@ -241,7 +233,6 @@
                 });
 
             } catch (err) {
-                console.error('Routing Machine 실패', err);
                 drawStraightLineFallback(start, end);
             }
         }
@@ -269,18 +260,29 @@
             document.getElementById('clearBtn').style.display = 'block';
         }
 
+        // 点击蓝色“开始导航”按钮 → 显示完整 Routing Machine 面板
         function startFullNavigation() {
             if (!currentRoutingControl) return;
+            
+            // 隐藏简洁摘要
             document.getElementById('routeSummary').style.display = 'none';
+            
+            // 显示右下角取消按钮
             document.getElementById('cancelNavBtn').style.display = 'block';
+            
+            // Routing Machine 面板默认会显示，这里我们确保它可见
         }
 
+        // 点击“取消导航” → 只隐藏详细面板，保留路线线
         function cancelFullNavigation() {
             if (currentRoutingControl) {
                 map.removeControl(currentRoutingControl);
                 currentRoutingControl = null;
             }
             document.getElementById('cancelNavBtn').style.display = 'none';
+            
+            // 注意：这里不调用 clearCurrentRoute，所以路线线会保留
+            // 用户可以用“경로 지우기”按钮来清除路线
         }
 
         function clearCurrentRoute(alsoHideInstruction = true) {
@@ -390,7 +392,7 @@
         });
 
         createMarkers();
-        console.log('✅ 完整优化版已加载（流程按要求调整）');
+        console.log('✅ 最终优化版已加载（严格按你的流程）');
     </script>
 </body>
 </html>
