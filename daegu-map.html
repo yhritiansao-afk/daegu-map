@@ -54,17 +54,15 @@
 
     <div id="clearBtn" class="control-btn" style="display:none;">🗑️ 경로 지우기</div>
     
-    <!-- 简洁路线摘要 + 开始导航按钮 -->
     <div id="routeSummary" class="route-summary">
         <div class="title">📍 경로 정보</div>
         <div class="detail" id="routeSummaryDetail"></div>
         <button class="start-nav-btn" onclick="startFullNavigation()">시작 내비게이션</button>
     </div>
 
-    <!-- 底部取消导航按钮 -->
     <div id="cancelNavBtn" class="cancel-nav-btn" onclick="cancelFullNavigation()">내비게이션 취소</div>
 
-    <!-- 添加设施表单（干净版本） -->
+    <!-- 添加设施表单 -->
     <div id="addForm" class="add-form">
         <h3>시설 추가</h3>
         <label>시설 유형</label>
@@ -128,7 +126,6 @@
 
         let facilities = [...defaultFacilities, ...userAddedFacilities];
 
-        // 获取用户真实位置
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
                 userLocation = [pos.coords.latitude, pos.coords.longitude];
@@ -180,7 +177,6 @@
                     map.closePopup();
                     return;
                 }
-                // 点击第二个点：只显示简洁摘要 + 开始导航按钮
                 tryRealRouting(startPoint, item);
                 document.getElementById('instructionBox').style.display = 'none';
                 startPoint = null;
@@ -194,12 +190,11 @@
             const endLatLng = L.latLng(end.lat, end.lng);
 
             if (typeof L.Routing === 'undefined') {
-                drawStraightLineFallback(start, end);
+                drawStraightLineFallback(start, end, true);
                 return;
             }
 
             try {
-                // 创建 RoutingControl 但先不添加到地图（关键！）
                 currentRoutingControl = L.Routing.control({
                     waypoints: [startLatLng, endLatLng],
                     routeWhileDragging: false,
@@ -212,45 +207,44 @@
                     }
                 });
 
+                // 监听路线成功事件
                 currentRoutingControl.on('routesfound', function(e) {
-                    const summary = e.routes[0].summary;
-                    const distanceKm = (summary.totalDistance / 1000).toFixed(2);
-                    const timeMin = Math.round(summary.totalTime / 60);
+                    const routes = e.routes;
+                    if (routes && routes.length > 0) {
+                        const summary = routes[0].summary;
+                        const distanceKm = (summary.totalDistance / 1000).toFixed(2);
+                        const timeMin = Math.round(summary.totalTime / 60);
 
-                    // 只显示简洁摘要 + 开始导航按钮
-                    const summaryBox = document.getElementById('routeSummary');
-                    const detail = document.getElementById('routeSummaryDetail');
-                    detail.innerHTML = `
-                        <b>시작:</b> ${start.name}<br>
-                        <b>도착:</b> ${end.name}<br>
-                        <span class="distance">실제 거리: 약 ${distanceKm} km</span><br>
-                        <b>예상 소요:</b> 약 ${timeMin} 분
-                    `;
-                    summaryBox.style.display = 'block';
-                    document.getElementById('clearBtn').style.display = 'block';
-                    
-                    window.currentRouteStart = start;
-                    window.currentRouteEnd = end;
-                });
-
-                // 手动触发计算（不添加到地图）
-                currentRoutingControl._router.route([startLatLng, endLatLng], function(err, routes) {
-                    if (!err && routes && routes.length > 0) {
-                        // 手动画一条蓝色路线（我们自己控制）
+                        // 画真实路线（从返回的 coordinates 里取）
                         const coords = routes[0].coordinates;
                         if (currentLine) map.removeLayer(currentLine);
                         currentLine = L.polyline(coords, {
                             color: '#3388ff', weight: 6, opacity: 0.9
                         }).addTo(map);
+
+                        // 显示简洁摘要
+                        const summaryBox = document.getElementById('routeSummary');
+                        const detail = document.getElementById('routeSummaryDetail');
+                        detail.innerHTML = `
+                            <b>시작:</b> ${start.name}<br>
+                            <b>도착:</b> ${end.name}<br>
+                            <span class="distance">실제 거리: 약 ${distanceKm} km</span><br>
+                            <b>예상 소요:</b> 약 ${timeMin} 분
+                        `;
+                        summaryBox.style.display = 'block';
+                        document.getElementById('clearBtn').style.display = 'block';
+                        
+                        window.currentRouteStart = start;
+                        window.currentRouteEnd = end;
                     }
                 });
 
             } catch (err) {
-                drawStraightLineFallback(start, end);
+                drawStraightLineFallback(start, end, true);
             }
         }
 
-        function drawStraightLineFallback(start, end) {
+        function drawStraightLineFallback(start, end, showFailTip = false) {
             currentLine = L.polyline([[start.lat, start.lng], [end.lat, end.lng]], {
                 color: '#3388ff', weight: 6, opacity: 0.9
             }).addTo(map);
@@ -266,28 +260,26 @@
                 <b>시작:</b> ${start.name}<br>
                 <b>도착:</b> ${end.name}<br>
                 <span class="distance">직선 거리: 약 ${distance} 미터</span><br>
-                <b>예상 소요:</b> 도보 약 ${walkingMinutes}분 / 휠체어 약 ${wheelchairMinutes}분<br>
-                <small style="color:#ff6b6b;">(真实路线加载失败)</small>
+                <b>예상 소요:</b> 도보 약 ${walkingMinutes}분 / 휠체어 약 ${wheelchairMinutes}분
+                ${showFailTip ? '<br><small style="color:#ff6b6b;">(真实路线加载失败)</small>' : ''}
             `;
             summaryBox.style.display = 'block';
             document.getElementById('clearBtn').style.display = 'block';
         }
 
-        // 点击蓝色“开始导航”按钮 → 显示完整 Routing Machine 面板
         function startFullNavigation() {
             if (!currentRoutingControl) return;
             
-            // 隐藏简洁摘要
             document.getElementById('routeSummary').style.display = 'none';
+            document.getElementById('clearBtn').style.display = 'none';
+            document.getElementById('legend').style.display = 'none';
             
-            // 把 RoutingControl 添加到地图（这时才显示详细导航面板）
+            // 这时才把 RoutingControl 加到地图，显示详细导航面板
             currentRoutingControl.addTo(map);
             
-            // 显示底部取消导航按钮
             document.getElementById('cancelNavBtn').style.display = 'block';
         }
 
-        // 点击“取消导航” —— 只移除详细面板，保留蓝色路线
         function cancelFullNavigation() {
             if (currentRoutingControl) {
                 map.removeControl(currentRoutingControl);
@@ -295,9 +287,10 @@
             }
             document.getElementById('cancelNavBtn').style.display = 'none';
             
-            // 重新显示简洁摘要 + 开始导航按钮
             if (window.currentRouteStart && window.currentRouteEnd) {
                 document.getElementById('routeSummary').style.display = 'block';
+                document.getElementById('clearBtn').style.display = 'block';
+                document.getElementById('legend').style.display = 'block';
             }
         }
 
@@ -308,6 +301,7 @@
             document.getElementById('routeSummary').style.display = 'none';
             document.getElementById('clearBtn').style.display = 'none';
             document.getElementById('cancelNavBtn').style.display = 'none';
+            document.getElementById('legend').style.display = 'block';
             
             if (alsoHideInstruction) {
                 document.getElementById('instructionBox').style.display = 'none';
@@ -317,7 +311,7 @@
             window.currentRouteEnd = null;
         }
 
-        // 长按地图添加设施
+        // 长按添加设施
         map.on('contextmenu', function(e) {
             pendingLatLng = e.latlng;
             if (tempMarker) map.removeLayer(tempMarker);
@@ -402,7 +396,6 @@
             editingFacilityId = null;
         }
 
-        // 清除路线按钮
         document.getElementById('clearBtn').addEventListener('click', () => {
             clearCurrentRoute(true);
             startPoint = null;
@@ -411,7 +404,7 @@
         });
 
         createMarkers();
-        console.log('✅ 修复版已加载');
+        console.log('✅ 最终修复版已加载（真实路线 + 流程控制）');
     </script>
 </body>
 </html>
