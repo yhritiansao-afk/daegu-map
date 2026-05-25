@@ -8,20 +8,26 @@
     <style>
         html, body, #map { margin:0; padding:0; width:100%; height:100vh; }
         .legend { position:absolute; bottom:15px; left:15px; background:white; padding:12px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:14px; line-height:1.8; }
-        .info { 
-            position:absolute; top:15px; right:15px; background:white; 
-            padding:10px 14px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.25); 
-            z-index:1000; font-size:13.5px; transition: all 0.3s ease;
-        }
+        .info { position:absolute; top:15px; right:15px; background:white; padding:10px 14px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.25); z-index:1000; font-size:13.5px; }
         .control-btn { position:absolute; top:70px; right:15px; background:white; padding:10px 14px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:14px; cursor:pointer; }
-        .route-info { 
-            position:absolute; top:120px; right:15px; background:white; 
-            padding:14px 18px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.2); 
-            z-index:1000; font-size:14px; min-width:200px; display:none; line-height:1.7;
-        }
+        .route-info { position:absolute; top:120px; right:15px; background:white; padding:14px 18px; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.2); z-index:1000; font-size:14px; min-width:200px; display:none; line-height:1.7; }
         .route-info .title { font-weight:bold; color:#222; margin-bottom:8px; }
         .route-info .detail { color:#444; }
         .route-info .distance { color:#3388ff; font-weight:600; }
+
+        /* 添加设施表单样式 */
+        .add-form {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 2000; width: 260px; display: none;
+        }
+        .add-form h3 { margin: 0 0 16px 0; text-align: center; }
+        .add-form label { display: block; margin: 10px 0 4px; font-size: 14px; }
+        .add-form input, .add-form select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+        .add-form .btn-group { display: flex; gap: 10px; margin-top: 16px; }
+        .add-form button { flex: 1; padding: 10px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+        .add-form .btn-cancel { background: #eee; }
+        .add-form .btn-confirm { background: #3388ff; color: white; }
     </style>
 </head>
 <body>
@@ -35,17 +41,33 @@
         👣 점자블록
     </div>
 
-    <!-- 右上角提示文字（会智能隐藏） -->
     <div id="instructionBox" class="info">
         👉 첫 번째 마커 → 시작점<br>
         👉 두 번째 마커 → 도착점
     </div>
 
     <div id="clearBtn" class="control-btn" style="display:none;">🗑️ 경로 지우기</div>
-    
     <div id="routeInfo" class="route-info">
         <div class="title">📍 경로 정보</div>
         <div class="detail" id="routeDetail"></div>
+    </div>
+
+    <!-- 添加设施表单 -->
+    <div id="addForm" class="add-form">
+        <h3>시설 추가</h3>
+        <label>시설 유형</label>
+        <select id="facilityType">
+            <option value="toilet">🚽 무장애 화장실</option>
+            <option value="elevator">🪜 무장애 엘리베이터</option>
+            <option value="ramp">♿ 무장애 경사로</option>
+            <option value="blind_road">👣 점자블록</option>
+        </select>
+        <label>시설 이름</label>
+        <input type="text" id="facilityName" placeholder="예: 동성로 무장애 화장실" />
+        <div class="btn-group">
+            <button class="btn-cancel" onclick="cancelAdd()">취소</button>
+            <button class="btn-confirm" onclick="confirmAdd()">추가</button>
+        </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -57,8 +79,13 @@
         let startPoint = null;
         let userLocation = [35.8714, 128.6014];
         let userMarker = null;
+        let tempMarker = null; // 临时标记
+        let pendingLatLng = null; // 记录长按位置
 
-        const facilities = [
+        // 从 localStorage 加载用户添加的设施
+        let userAddedFacilities = JSON.parse(localStorage.getItem('userAddedFacilities') || '[]');
+
+        const defaultFacilities = [
             { id: 101, name: "대구역 무장애 화장실", type: "toilet", lat: 35.8714, lng: 128.6014 },
             { id: 102, name: "동성로 무장애 화장실", type: "toilet", lat: 35.8668, lng: 128.5972 },
             { id: 201, name: "경북대학교 중앙도서관 무장애 엘리베이터", type: "elevator", lat: 35.8851, lng: 128.6053 },
@@ -66,6 +93,10 @@
             { id: 401, name: "중앙로 점자블록", type: "blind_road", lat: 35.8692, lng: 128.5934 }
         ];
 
+        // 合并默认设施 + 用户添加的设施
+        let facilities = [...defaultFacilities, ...userAddedFacilities];
+
+        // 获取用户真实位置
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
                 userLocation = [pos.coords.latitude, pos.coords.longitude];
@@ -82,7 +113,8 @@
         function createMarkers() {
             allMarkers.forEach(m => map.removeLayer(m));
             allMarkers = [];
-            facilities.forEach(item => {
+
+            facilities.forEach((item, index) => {
                 const emoji = { toilet: '🚽', elevator: '🪜', ramp: '♿', blind_road: '👣' }[item.type] || '📍';
                 const marker = L.marker([item.lat, item.lng]).addTo(map);
                 marker.bindPopup(`<b>${item.name}</b><br>${emoji}`);
@@ -92,9 +124,7 @@
         }
 
         function handleMarkerClick(item) {
-            // 点击标记后隐藏右上角提示
             document.getElementById('instructionBox').style.display = 'none';
-
             if (!startPoint) {
                 startPoint = item;
                 L.popup().setLatLng([item.lat, item.lng]).setContent(`<b>✅ 시작점 설정</b><br>${item.name}`).openOn(map);
@@ -106,7 +136,6 @@
 
         function drawRoute(start, end) {
             if (currentLine) map.removeLayer(currentLine);
-
             currentLine = L.polyline([[start.lat, start.lng], [end.lat, end.lng]], {
                 color: '#3388ff', weight: 6, opacity: 0.9
             }).addTo(map);
@@ -128,18 +157,75 @@
             document.getElementById('clearBtn').style.display = 'block';
         }
 
-        // 清除路线（彻底重置 + 重新显示提示文字）
+        // 长按地图添加设施
+        map.on('contextmenu', function(e) {
+            pendingLatLng = e.latlng;
+            
+            // 显示临时标记
+            if (tempMarker) map.removeLayer(tempMarker);
+            tempMarker = L.marker(e.latlng, {
+                icon: L.divIcon({ html: '📍', iconSize: [30, 30], className: 'temp-marker' })
+            }).addTo(map);
+
+            // 显示添加表单
+            document.getElementById('addForm').style.display = 'block';
+            document.getElementById('facilityName').focus();
+        });
+
+        function confirmAdd() {
+            const type = document.getElementById('facilityType').value;
+            const name = document.getElementById('facilityName').value.trim() || '새 시설';
+
+            if (!pendingLatLng) return;
+
+            const newFacility = {
+                id: Date.now(),
+                name: name,
+                type: type,
+                lat: pendingLatLng.lat,
+                lng: pendingLatLng.lng
+            };
+
+            // 保存到用户添加列表
+            userAddedFacilities.push(newFacility);
+            localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
+
+            // 更新 facilities 数组并重新渲染标记
+            facilities.push(newFacility);
+            createMarkers();
+
+            // 隐藏表单和临时标记
+            document.getElementById('addForm').style.display = 'none';
+            if (tempMarker) {
+                map.removeLayer(tempMarker);
+                tempMarker = null;
+            }
+            pendingLatLng = null;
+
+            // 提示用户
+            alert('시설이 추가되었습니다!');
+        }
+
+        function cancelAdd() {
+            document.getElementById('addForm').style.display = 'none';
+            if (tempMarker) {
+                map.removeLayer(tempMarker);
+                tempMarker = null;
+            }
+            pendingLatLng = null;
+        }
+
+        // 清除路线
         document.getElementById('clearBtn').addEventListener('click', () => {
             if (currentLine) map.removeLayer(currentLine);
             currentLine = null;
             startPoint = null;
             document.getElementById('routeInfo').style.display = 'none';
             document.getElementById('clearBtn').style.display = 'none';
-            document.getElementById('instructionBox').style.display = 'block'; // 重新显示提示
+            document.getElementById('instructionBox').style.display = 'block';
             map.closePopup();
         });
 
-        // 点击路线信息面板也可清除
         document.getElementById('routeInfo').addEventListener('click', () => {
             if (currentLine) map.removeLayer(currentLine);
             currentLine = null;
@@ -151,7 +237,7 @@
         });
 
         createMarkers();
-        console.log('✅ 路径规划阶段一最终优化版（智能隐藏提示 + 时间估算）');
+        console.log('✅ 长按添加设施功能已启用（长按地图即可添加）');
     </script>
 </body>
 </html>
