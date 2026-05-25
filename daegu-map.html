@@ -137,10 +137,8 @@
                 const isUserAdded = userAddedFacilities.some(f => f.id === item.id);
                 
                 if (isUserAdded) {
-                    // 用户添加的点：显示基本信息 + 长按提示
                     marker.bindPopup(`<b>${item.name}</b><br>${emoji}<br><small style="color:#888">(길게 누르면 수정/삭제)</small>`);
                     
-                    // 长按触发编辑删除菜单
                     marker.on('contextmenu', (e) => {
                         e.originalEvent.preventDefault();
                         startEditFacility(item.id);
@@ -156,10 +154,24 @@
 
         function handleMarkerClick(item) {
             document.getElementById('instructionBox').style.display = 'none';
+
             if (!startPoint) {
+                // 第一次点击 → 设置为起点
                 startPoint = item;
-                L.popup().setLatLng([item.lat, item.lng]).setContent(`<b>✅ 시작점 설정</b><br>${item.name}`).openOn(map);
+                L.popup()
+                    .setLatLng([item.lat, item.lng])
+                    .setContent(`<b>✅ 시작점 설정</b><br>${item.name}<br><small style="color:#888">다시 클릭하면 취소됩니다</small>`)
+                    .openOn(map);
             } else {
+                // 第二次点击
+                if (startPoint.id === item.id) {
+                    // 点击的是同一个点 → 取消选择
+                    startPoint = null;
+                    map.closePopup();
+                    return;
+                }
+
+                // 正常绘制路线
                 drawRoute(startPoint, item);
                 startPoint = null;
             }
@@ -304,7 +316,7 @@
         });
 
         createMarkers();
-        console.log('✅ 交互逻辑已优化（单击路径规划，长按编辑删除）');
+        console.log('✅ 完整优化版已加载（禁止原地导航 + 智能交互）');
     </script>
 </body>
 </html>
