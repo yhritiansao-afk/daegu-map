@@ -4,7 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>대구 무장애 지도</title>
+    
+    <!-- Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Leaflet Routing Machine -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    
     <style>
         html, body, #map { margin:0; padding:0; width:100%; height:100vh; }
         .legend { position:absolute; bottom:15px; left:15px; background:white; padding:12px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:14px; line-height:1.8; }
@@ -28,6 +34,12 @@
         .btn-cancel { background: #eee; }
         .btn-confirm { background: #3388ff; color: white; }
         .btn-danger { background: #ff4757; color: white; }
+        
+        .routing-fallback { 
+            position:absolute; top:175px; right:15px; background:#fff3cd; 
+            color:#856404; padding:6px 12px; border-radius:6px; font-size:12px; 
+            z-index:1000; display:none; box-shadow:0 2px 8px rgba(0,0,0,0.15);
+        }
     </style>
 </head>
 <body>
@@ -50,6 +62,11 @@
     <div id="routeInfo" class="route-info">
         <div class="title">📍 경로 정보</div>
         <div class="detail" id="routeDetail"></div>
+    </div>
+    
+    <!-- 真实路线失败提示 -->
+    <div id="routingFallbackTip" class="routing-fallback">
+        ⚠️ 真实路线加载失败，已切换为直线
     </div>
 
     <!-- 添加表单 -->
@@ -89,12 +106,16 @@
         </div>
     </div>
 
+    <!-- Leaflet + Routing Machine -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    
     <script>
         const map = L.map('map').setView([35.8714, 128.6014], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         let currentLine = null;
+        let currentRoutingControl = null; // 真实路线控制
         let startPoint = null;
         let userLocation = [35.8714, 128.6014];
         let userMarker = null;
@@ -113,6 +134,7 @@
 
         let facilities = [...defaultFacilities, ...userAddedFacilities];
 
+        // 获取用户真实位置
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
                 userLocation = [pos.coords.latitude, pos.coords.longitude];
@@ -138,7 +160,6 @@
                 
                 if (isUserAdded) {
                     marker.bindPopup(`<b>${item.name}</b><br>${emoji}<br><small style="color:#888">(길게 누르면 수정/삭제)</small>`);
-                    
                     marker.on('contextmenu', (e) => {
                         e.originalEvent.preventDefault();
                         startEditFacility(item.id);
@@ -156,29 +177,83 @@
             document.getElementById('instructionBox').style.display = 'none';
 
             if (!startPoint) {
-                // 第一次点击 → 设置为起点
                 startPoint = item;
                 L.popup()
                     .setLatLng([item.lat, item.lng])
                     .setContent(`<b>✅ 시작점 설정</b><br>${item.name}<br><small style="color:#888">다시 클릭하면 취소됩니다</small>`)
                     .openOn(map);
             } else {
-                // 第二次点击
                 if (startPoint.id === item.id) {
-                    // 点击的是同一个点 → 取消选择
                     startPoint = null;
                     map.closePopup();
                     return;
                 }
-
-                // 正常绘制路线
-                drawRoute(startPoint, item);
+                // 尝试真实路线，失败则回退直线
+                tryRealRouting(startPoint, item);
                 startPoint = null;
             }
         }
 
-        function drawRoute(start, end) {
-            if (currentLine) map.removeLayer(currentLine);
+        // 尝试真实路线（失败自动回退）
+        function tryRealRouting(start, end) {
+            // 先清除旧路线
+            clearCurrentRoute();
+
+            const startLatLng = L.latLng(start.lat, start.lng);
+            const endLatLng = L.latLng(end.lat, end.lng);
+
+            // 检查 Routing Machine 是否可用
+            if (typeof L.Routing === 'undefined' || !L.Routing.control) {
+                console.warn('Routing Machine 未加载，使用直线方案');
+                drawStraightLine(start, end);
+                showFallbackTip();
+                return;
+            }
+
+            try {
+                currentRoutingControl = L.Routing.control({
+                    waypoints: [startLatLng, endLatLng],
+                    routeWhileDragging: false,
+                    addWaypoints: false,
+                    draggableWaypoints: false,
+                    fitSelectedRoutes: true,
+                    showAlternatives: false,
+                    lineOptions: {
+                        styles: [{ color: '#3388ff', weight: 6, opacity: 0.85 }]
+                    }
+                }).addTo(map);
+
+                // 监听路线成功事件
+                currentRoutingControl.on('routesfound', function(e) {
+                    const routes = e.routes;
+                    if (routes && routes.length > 0) {
+                        const summary = routes[0].summary;
+                        const distance = (summary.totalDistance / 1000).toFixed(2);
+                        const timeMin = Math.round(summary.totalTime / 60);
+
+                        const routeInfo = document.getElementById('routeInfo');
+                        const routeDetail = document.getElementById('routeDetail');
+                        routeDetail.innerHTML = `
+                            <b>시작:</b> ${start.name}<br>
+                            <b>도착:</b> ${end.name}<br>
+                            <span class="distance">实际距离: 약 ${distance} km</span><br>
+                            <b>예상 소요:</b> 약 ${timeMin} 분
+                        `;
+                        routeInfo.style.display = 'block';
+                        document.getElementById('clearBtn').style.display = 'block';
+                        document.getElementById('routingFallbackTip').style.display = 'none';
+                    }
+                });
+
+            } catch (err) {
+                console.error('Routing Machine 加载失败，回退直线', err);
+                drawStraightLine(start, end);
+                showFallbackTip();
+            }
+        }
+
+        // 绘制直线（回退方案）
+        function drawStraightLine(start, end) {
             currentLine = L.polyline([[start.lat, start.lng], [end.lat, end.lng]], {
                 color: '#3388ff', weight: 6, opacity: 0.9
             }).addTo(map);
@@ -194,20 +269,57 @@
                 <b>시작:</b> ${start.name}<br>
                 <b>도착:</b> ${end.name}<br>
                 <span class="distance">직선 거리: 약 ${distance} 미터</span><br>
-                <b>예상 소요:</b> 도보 약 ${walkingMinutes}분 / 휠체어 약 ${wheelchairMinutes}분
+                <b>예상 소요:</b> 도보 약 ${walkingMinutes}분 / 휠체어 약 ${wheelchairMinutes}분<br>
+                <small style="color:#ff6b6b;">(真实路线加载失败)</small>
             `;
             routeInfo.style.display = 'block';
             document.getElementById('clearBtn').style.display = 'block';
         }
 
-        // 长按地图添加新设施
+        function showFallbackTip() {
+            const tip = document.getElementById('routingFallbackTip');
+            tip.style.display = 'block';
+            setTimeout(() => {
+                tip.style.display = 'none';
+            }, 3500);
+        }
+
+        function clearCurrentRoute() {
+            if (currentLine) {
+                map.removeLayer(currentLine);
+                currentLine = null;
+            }
+            if (currentRoutingControl) {
+                map.removeControl(currentRoutingControl);
+                currentRoutingControl = null;
+            }
+            document.getElementById('routeInfo').style.display = 'none';
+            document.getElementById('clearBtn').style.display = 'none';
+            document.getElementById('routingFallbackTip').style.display = 'none';
+        }
+
+        // 清除路线按钮
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            clearCurrentRoute();
+            startPoint = null;
+            document.getElementById('instructionBox').style.display = 'block';
+            map.closePopup();
+        });
+
+        document.getElementById('routeInfo').addEventListener('click', () => {
+            clearCurrentRoute();
+            startPoint = null;
+            document.getElementById('instructionBox').style.display = 'block';
+            map.closePopup();
+        });
+
+        // 长按地图添加设施
         map.on('contextmenu', function(e) {
             pendingLatLng = e.latlng;
             if (tempMarker) map.removeLayer(tempMarker);
             tempMarker = L.marker(e.latlng, {
                 icon: L.divIcon({ html: '📍', iconSize: [30, 30] })
             }).addTo(map);
-
             document.getElementById('addForm').style.display = 'block';
             document.getElementById('facilityName').focus();
         });
@@ -242,11 +354,9 @@
             pendingLatLng = null;
         }
 
-        // 编辑功能
         function startEditFacility(id) {
             const facility = facilities.find(f => f.id === id);
             if (!facility) return;
-
             editingFacilityId = id;
             document.getElementById('editFacilityType').value = facility.type;
             document.getElementById('editFacilityName').value = facility.name;
@@ -255,7 +365,6 @@
 
         function confirmEdit() {
             if (!editingFacilityId) return;
-
             const newType = document.getElementById('editFacilityType').value;
             const newName = document.getElementById('editFacilityName').value.trim();
 
@@ -265,13 +374,11 @@
                 userAddedFacilities[index].name = newName;
                 localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
             }
-
             const facIndex = facilities.findIndex(f => f.id === editingFacilityId);
             if (facIndex !== -1) {
                 facilities[facIndex].type = newType;
                 facilities[facIndex].name = newName;
             }
-
             document.getElementById('editForm').style.display = 'none';
             createMarkers();
             editingFacilityId = null;
@@ -284,39 +391,16 @@
 
         function deleteFacility() {
             if (!editingFacilityId || !confirm('정말 삭제하시겠습니까?')) return;
-
             userAddedFacilities = userAddedFacilities.filter(f => f.id !== editingFacilityId);
             localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
             facilities = facilities.filter(f => f.id !== editingFacilityId);
-
             document.getElementById('editForm').style.display = 'none';
             createMarkers();
             editingFacilityId = null;
         }
 
-        // 清除路线
-        document.getElementById('clearBtn').addEventListener('click', () => {
-            if (currentLine) map.removeLayer(currentLine);
-            currentLine = null;
-            startPoint = null;
-            document.getElementById('routeInfo').style.display = 'none';
-            document.getElementById('clearBtn').style.display = 'none';
-            document.getElementById('instructionBox').style.display = 'block';
-            map.closePopup();
-        });
-
-        document.getElementById('routeInfo').addEventListener('click', () => {
-            if (currentLine) map.removeLayer(currentLine);
-            currentLine = null;
-            startPoint = null;
-            document.getElementById('routeInfo').style.display = 'none';
-            document.getElementById('clearBtn').style.display = 'none';
-            document.getElementById('instructionBox').style.display = 'block';
-            map.closePopup();
-        });
-
         createMarkers();
-        console.log('✅ 完整优化版已加载（禁止原地导航 + 智能交互）');
+        console.log('✅ 真实路线功能已集成（优先尝试 Routing Machine，失败自动回退）');
     </script>
 </body>
 </html>
