@@ -39,7 +39,7 @@
 <body>
     <div id="map"></div>
 
-    <div class="legend" id="legend">
+    <div class="legend">
         <strong>🗺️ 범례</strong><br>
         🚽 무장애 화장실<br>
         🪜 무장애 엘리베이터<br>
@@ -64,7 +64,7 @@
     <!-- 底部取消导航按钮 -->
     <div id="cancelNavBtn" class="cancel-nav-btn" onclick="cancelFullNavigation()">내비게이션 취소</div>
 
-    <!-- 添加设施表单 -->
+    <!-- 添加设施表单（干净版本） -->
     <div id="addForm" class="add-form">
         <h3>시설 추가</h3>
         <label>시설 유형</label>
@@ -199,6 +199,7 @@
             }
 
             try {
+                // 创建 RoutingControl 但先不添加到地图（关键！）
                 currentRoutingControl = L.Routing.control({
                     waypoints: [startLatLng, endLatLng],
                     routeWhileDragging: false,
@@ -209,7 +210,7 @@
                     lineOptions: {
                         styles: [{ color: '#3388ff', weight: 6, opacity: 0.85 }]
                     }
-                }).addTo(map);
+                });
 
                 currentRoutingControl.on('routesfound', function(e) {
                     const summary = e.routes[0].summary;
@@ -230,6 +231,18 @@
                     
                     window.currentRouteStart = start;
                     window.currentRouteEnd = end;
+                });
+
+                // 手动触发计算（不添加到地图）
+                currentRoutingControl._router.route([startLatLng, endLatLng], function(err, routes) {
+                    if (!err && routes && routes.length > 0) {
+                        // 手动画一条蓝色路线（我们自己控制）
+                        const coords = routes[0].coordinates;
+                        if (currentLine) map.removeLayer(currentLine);
+                        currentLine = L.polyline(coords, {
+                            color: '#3388ff', weight: 6, opacity: 0.9
+                        }).addTo(map);
+                    }
                 });
 
             } catch (err) {
@@ -260,20 +273,21 @@
             document.getElementById('clearBtn').style.display = 'block';
         }
 
-        // 点击蓝色“开始导航”按钮
+        // 点击蓝色“开始导航”按钮 → 显示完整 Routing Machine 面板
         function startFullNavigation() {
             if (!currentRoutingControl) return;
             
-            // 隐藏简洁摘要和清除按钮、图例
+            // 隐藏简洁摘要
             document.getElementById('routeSummary').style.display = 'none';
-            document.getElementById('clearBtn').style.display = 'none';
-            document.getElementById('legend').style.display = 'none';
+            
+            // 把 RoutingControl 添加到地图（这时才显示详细导航面板）
+            currentRoutingControl.addTo(map);
             
             // 显示底部取消导航按钮
             document.getElementById('cancelNavBtn').style.display = 'block';
         }
 
-        // 点击“取消导航” —— 只隐藏详细面板，保留路线，重新显示摘要
+        // 点击“取消导航” —— 只移除详细面板，保留蓝色路线
         function cancelFullNavigation() {
             if (currentRoutingControl) {
                 map.removeControl(currentRoutingControl);
@@ -281,11 +295,9 @@
             }
             document.getElementById('cancelNavBtn').style.display = 'none';
             
-            // 重新显示简洁摘要 + 开始导航按钮 + 清除按钮 + 图例
+            // 重新显示简洁摘要 + 开始导航按钮
             if (window.currentRouteStart && window.currentRouteEnd) {
                 document.getElementById('routeSummary').style.display = 'block';
-                document.getElementById('clearBtn').style.display = 'block';
-                document.getElementById('legend').style.display = 'block';
             }
         }
 
@@ -296,7 +308,6 @@
             document.getElementById('routeSummary').style.display = 'none';
             document.getElementById('clearBtn').style.display = 'none';
             document.getElementById('cancelNavBtn').style.display = 'none';
-            document.getElementById('legend').style.display = 'block';
             
             if (alsoHideInstruction) {
                 document.getElementById('instructionBox').style.display = 'none';
@@ -400,7 +411,7 @@
         });
 
         createMarkers();
-        console.log('✅ 最终完整版已加载（严格按你的流程）');
+        console.log('✅ 修复版已加载');
     </script>
 </body>
 </html>
