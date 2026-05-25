@@ -189,17 +189,17 @@
             const startLatLng = L.latLng(start.lat, start.lng);
             const endLatLng = L.latLng(end.lat, end.lng);
 
-            // 先创建一个超时保护，3秒后如果还没反应就回退直线
-            let hasResponded = false;
-            const timeoutId = setTimeout(() => {
-                if (!hasResponded) {
-                    console.warn('真实路线超时，回退直线');
+            // 超时保护：3秒后如果还没反应就强制显示直线
+            let responded = false;
+            setTimeout(() => {
+                if (!responded) {
+                    console.warn('Routing超时，强制显示直线');
                     drawStraightLineFallback(start, end);
                 }
             }, 3000);
 
             if (typeof L.Routing === 'undefined') {
-                clearTimeout(timeoutId);
+                responded = true;
                 drawStraightLineFallback(start, end);
                 return;
             }
@@ -218,20 +218,18 @@
                 }).addTo(map);
 
                 currentRoutingControl.on('routesfound', function(e) {
-                    hasResponded = true;
-                    clearTimeout(timeoutId);
-
+                    responded = true;
                     const routes = e.routes;
                     if (routes && routes.length > 0) {
                         const summary = routes[0].summary;
                         const distanceKm = (summary.totalDistance / 1000).toFixed(2);
                         const timeMin = Math.round(summary.totalTime / 60);
 
-                        // 隐藏 Routing Machine 自带面板
+                        // 隐藏详细面板
                         const container = currentRoutingControl.getContainer();
                         if (container) container.style.display = 'none';
 
-                        // 显示我们自己的简洁摘要
+                        // 显示简洁摘要
                         const summaryBox = document.getElementById('routeSummary');
                         const detail = document.getElementById('routeSummaryDetail');
                         detail.innerHTML = `
@@ -248,16 +246,13 @@
                     }
                 });
 
-                currentRoutingControl.on('routingerror', function(e) {
-                    hasResponded = true;
-                    clearTimeout(timeoutId);
-                    console.error('Routing error:', e);
+                currentRoutingControl.on('routingerror', function() {
+                    responded = true;
                     drawStraightLineFallback(start, end);
                 });
 
             } catch (err) {
-                hasResponded = true;
-                clearTimeout(timeoutId);
+                responded = true;
                 console.error(err);
                 drawStraightLineFallback(start, end);
             }
@@ -288,7 +283,6 @@
 
         function startFullNavigation() {
             if (!currentRoutingControl) return;
-            
             document.getElementById('routeSummary').style.display = 'none';
             document.getElementById('clearBtn').style.display = 'none';
             document.getElementById('legend').style.display = 'none';
@@ -315,10 +309,7 @@
 
         function clearCurrentRoute(alsoHideInstruction = true) {
             if (currentLine) { map.removeLayer(currentLine); currentLine = null; }
-            if (currentRoutingControl) { 
-                map.removeControl(currentRoutingControl); 
-                currentRoutingControl = null; 
-            }
+            if (currentRoutingControl) { map.removeControl(currentRoutingControl); currentRoutingControl = null; }
             
             document.getElementById('routeSummary').style.display = 'none';
             document.getElementById('clearBtn').style.display = 'none';
@@ -333,7 +324,7 @@
             window.currentRouteEnd = null;
         }
 
-        // 长按添加设施
+        // 长按添加
         map.on('contextmenu', function(e) {
             pendingLatLng = e.latlng;
             if (tempMarker) map.removeLayer(tempMarker);
@@ -426,7 +417,7 @@
         });
 
         createMarkers();
-        console.log('✅ 带超时保护的稳定版已加载');
+        console.log('✅ 最终稳定版已加载');
     </script>
 </body>
 </html>
