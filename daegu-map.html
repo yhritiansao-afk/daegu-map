@@ -354,6 +354,7 @@ function syncUserAddedFacilitiesToMiniProgram() {
 
             userAddedFacilities.push(newFacility);
             localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
+            syncUserAddedFacilitiesToMiniProgram();
             facilities.push(newFacility);
             createMarkers();
 
