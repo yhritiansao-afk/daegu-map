@@ -119,6 +119,24 @@
 
     // 页面加载时立即执行
     initDataFromMiniProgram();
+        // ==================== 新增：同步用户添加的设施到小程序 ====================
+function syncUserAddedFacilitiesToMiniProgram() {
+    if (userAddedFacilities && userAddedFacilities.length > 0) {
+        wx.miniProgram.postMessage({
+            data: {
+                type: 'syncUserAddedFacilities',
+                payload: userAddedFacilities
+            }
+        });
+        console.log('已向小程序同步用户添加的设施，共', userAddedFacilities.length, '条');
+    }
+}
+
+// 延迟一点执行同步（确保 H5 数据已加载完成）
+setTimeout(() => {
+    syncUserAddedFacilitiesToMiniProgram();
+}, 1500);
+// =====================================================================
    
         const map = L.map('map').setView([35.8714, 128.6014], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
