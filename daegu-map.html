@@ -96,6 +96,39 @@
     </div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script>
+    // ==================== 1. 先放我们新增的函数 ====================
+    function initDataFromMiniProgram() {
+        const params = new URLSearchParams(window.location.search);
+        const facilitiesStr = params.get('facilities');
+
+        if (facilitiesStr) {
+            try {
+                const facilities = JSON.parse(decodeURIComponent(facilitiesStr));
+                console.log('✅ 从小程序收到设施数据，共', facilities.length, '条');
+
+                // TODO: 你可以在这里把 facilities 合并到你的数据里
+                // 例如：window.receivedFacilities = facilities;
+            } catch (err) {
+                console.error('解析小程序传来的设施数据失败', err);
+            }
+        } else {
+            console.log('没有从小程序收到设施参数');
+        }
+    }
+
+    // 页面加载时立即执行
+    initDataFromMiniProgram();
+
+    // ==================== 2. 再放你原来的地图代码 ====================
+    const map = L.map('map').setView([35.8714, 128.6014], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    let currentLine = null;
+    let currentRoutingControl = null;
+    // ... 你后面所有的代码都继续写在这里
+
+    </script>
    
     <script>
         const map = L.map('map').setView([35.8714, 128.6014], 13);
