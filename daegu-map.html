@@ -120,10 +120,6 @@
     // 页面加载时立即执行
     initDataFromMiniProgram();
 
-    // ==================== 2. 再放你原来的地图代码 ====================
-    const map = L.map('map').setView([35.8714, 128.6014], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
     let currentLine = null;
     let currentRoutingControl = null;
    
