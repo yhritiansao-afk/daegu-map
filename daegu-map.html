@@ -422,8 +422,8 @@ function syncUserAddedFacilitiesToMiniProgram() {
 
         createMarkers();
         console.log('✅ 最终修正完整版已加载');
-    </script>
-    // ==================== 【新增】监听来自小程序的消息 ====================
+
+        // ==================== 【新增】监听来自小程序的消息 ====================
 wx.miniProgram.onMessage = function(res) {
     console.log('收到小程序消息:', res.data);
     const message = res.data;
@@ -448,5 +448,6 @@ setTimeout(() => {
         syncUserAddedFacilitiesToMiniProgram();
     }
 }, 1500);
+    </script>
 </body>
 </html>
