@@ -119,23 +119,6 @@
 
     // 页面加载时立即执行
     initDataFromMiniProgram();
-        // ==================== 新增：监听来自小程序的消息 ====================
-wx.miniProgram.onMessage = function(res) {
-    console.log('收到小程序消息:', res.data);
-    const message = res.data;
-
-    if (!message || !message.type) return;
-
-    // 从个人中心跳转过来，需要定位到某个设施
-    if (message.type === 'focusFacility') {
-        const { lat, lng, id } = message.payload || {};
-        console.log('需要定位到设施:', lat, lng, id);
-
-        if (map && lat && lng) {
-            map.setView([lat, lng], 17); // 移动地图并放大
-        }
-    }
-};
         // ==================== 新增：同步用户添加的设施到小程序 ====================
 function syncUserAddedFacilitiesToMiniProgram() {
     if (userAddedFacilities && userAddedFacilities.length > 0) {
@@ -149,10 +132,6 @@ function syncUserAddedFacilitiesToMiniProgram() {
     }
 }
 
-// 延迟一点执行同步（确保 H5 数据已加载完成）
-setTimeout(() => {
-    syncUserAddedFacilitiesToMiniProgram();
-}, 1500);
 // =====================================================================
    
         const map = L.map('map').setView([35.8714, 128.6014], 13);
@@ -444,5 +423,30 @@ setTimeout(() => {
         createMarkers();
         console.log('✅ 最终修正完整版已加载');
     </script>
+    // ==================== 【新增】监听来自小程序的消息 ====================
+wx.miniProgram.onMessage = function(res) {
+    console.log('收到小程序消息:', res.data);
+    const message = res.data;
+
+    if (!message || !message.type) return;
+
+    // 从个人中心跳转过来，需要定位到某个设施
+    if (message.type === 'focusFacility') {
+        const { lat, lng, id } = message.payload || {};
+        console.log('需要定位到设施:', lat, lng, id);
+
+        if (map && lat && lng) {
+            map.setView([lat, lng], 17);
+        }
+    }
+};
+// =====================================================================
+
+// 延迟同步用户添加的设施到小程序
+setTimeout(() => {
+    if (typeof syncUserAddedFacilitiesToMiniProgram === 'function') {
+        syncUserAddedFacilitiesToMiniProgram();
+    }
+}, 1500);
 </body>
 </html>
