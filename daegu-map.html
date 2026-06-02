@@ -434,7 +434,7 @@ function syncUserAddedFacilitiesToMiniProgram() {
 
 
         // ==================== 【新增】监听来自小程序的消息 ====================
-wx.miniProgram.onMessage = function(res) {
+wx.miniProgram.onMessage function(res) {
     console.log('收到小程序消息:', res.data);
     const message = res.data;
 
