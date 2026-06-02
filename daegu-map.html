@@ -441,15 +441,33 @@ wx.miniProgram.onMessage = function(res) {
     if (!message || !message.type) return;
 
     // 从个人中心跳转过来，需要定位到某个设施
-    if (message.type === 'focusFacility') {
-        const { lat, lng, id } = message.payload || {};
-        console.log('需要定位到设施:', lat, lng, id);
+if (message.type === 'focusFacility') {
+    const { lat, lng, id, autoRoute } = message.payload || {};
+    console.log('需要定位到设施:', lat, lng, id, 'autoRoute:', autoRoute);
 
-        if (map && lat && lng) {
-            map.setView([lat, lng], 17);
+    if (map && lat && lng) {
+        map.setView([lat, lng], 17);
+
+        // 如果是来自个人中心导航，则自动规划路线
+        if (autoRoute && userLocation) {
+            const start = {
+                name: "当前位置",
+                lat: userLocation[0],
+                lng: userLocation[1]
+            };
+            const end = {
+                name: "目标设施",
+                lat: lat,
+                lng: lng
+            };
+
+            // 延迟一点再规划路线，避免地图移动冲突
+            setTimeout(() => {
+                tryRealRouting(start, end);
+            }, 600);
         }
     }
-};
+}
 // =====================================================================
 
 // 延迟同步用户添加的设施到小程序
