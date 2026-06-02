@@ -340,28 +340,32 @@ function syncUserAddedFacilitiesToMiniProgram() {
         });
 
         function confirmAdd() {
-            const type = document.getElementById('facilityType').value;
-            const name = document.getElementById('facilityName').value.trim() || '새 시설';
-            if (!pendingLatLng) return;
+    const type = document.getElementById('facilityType').value;
+    const name = document.getElementById('facilityName').value.trim() || '새 시설';
+    if (!pendingLatLng) return;
 
-            const newFacility = {
-                id: Date.now(),
-                name: name,
-                type: type,
-                lat: pendingLatLng.lat,
-                lng: pendingLatLng.lng
-            };
+    const newFacility = {
+        id: Date.now(),
+        name: name,
+        type: type,
+        lat: pendingLatLng.lat,
+        lng: pendingLatLng.lng
+    };
 
-            userAddedFacilities.push(newFacility);
-            localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
-            syncUserAddedFacilitiesToMiniProgram();
-            facilities.push(newFacility);
-            createMarkers();
+    userAddedFacilities.push(newFacility);
+    localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
 
-            document.getElementById('addForm').style.display = 'none';
-            if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
-            pendingLatLng = null;
-        }
+    facilities.push(newFacility);
+    createMarkers();
+
+    // 关闭表单 + 清理临时标记
+    document.getElementById('addForm').style.display = 'none';
+    if (tempMarker) {
+        map.removeLayer(tempMarker);
+        tempMarker = null;
+    }
+    pendingLatLng = null;
+}
 
         function cancelAdd() {
             document.getElementById('addForm').style.display = 'none';
