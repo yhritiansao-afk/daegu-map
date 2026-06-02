@@ -409,14 +409,23 @@ function syncUserAddedFacilitiesToMiniProgram() {
         }
 
         function deleteFacility() {
-            if (!editingFacilityId || !confirm('정말 삭제하시겠습니까?')) return;
-            userAddedFacilities = userAddedFacilities.filter(f => f.id !== editingFacilityId);
-            localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
-            facilities = facilities.filter(f => f.id !== editingFacilityId);
-            document.getElementById('editForm').style.display = 'none';
-            createMarkers();
-            editingFacilityId = null;
-        }
+    if (!editingFacilityId || !confirm('정말 삭제하시겠습니까?')) return;
+
+    // 1. 从 userAddedFacilities 删除
+    userAddedFacilities = userAddedFacilities.filter(f => f.id !== editingFacilityId);
+    localStorage.setItem('userAddedFacilities', JSON.stringify(userAddedFacilities));
+
+    // 2. 从 facilities 删除
+    facilities = facilities.filter(f => f.id !== editingFacilityId);
+
+    // 3. 关闭表单
+    document.getElementById('editForm').style.display = 'none';
+
+    // 4. 强制刷新地图（最关键）
+    createMarkers();
+
+    editingFacilityId = null;
+}
 
         document.getElementById('clearBtn').addEventListener('click', () => {
             clearCurrentRoute(true);
