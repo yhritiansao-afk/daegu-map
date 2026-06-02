@@ -434,8 +434,6 @@ function syncUserAddedFacilitiesToMiniProgram() {
             map.closePopup();
         });
 
-        createMarkers();
-        console.log('✅ 最终修正完整版已加载');
 
         // ==================== 【新增】监听来自小程序的消息 ====================
 wx.miniProgram.onMessage = function(res) {
